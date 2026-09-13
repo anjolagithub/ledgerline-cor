@@ -1,1 +1,12 @@
 [workspace]
+
+# Endpoints below are copied verbatim from the official Arbitrum docs
+# (docs.arbitrum.io/stylus/reference/stylus-toml-reference).
+# TODO: add a Robinhood Chain testnet entry once its official RPC URL
+# is confirmed against Robinhood Chain's own documentation — do not
+# invent one.
+[workspace.networks.arbitrum-sepolia]
+endpoint = "https://sepolia-rollup.arbitrum.io/rpc"
+
+[workspace.networks.arbitrum-one]
+endpoint = "https://arb1.arbitrum.io/rpc"
