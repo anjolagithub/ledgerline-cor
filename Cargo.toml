@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = [
+    "stylus/position-engine",
+    "stylus/risk-engine",
+]
+
+# Shared release profile, tuned for small onchain WASM binaries.
+# (Per Arbitrum's official Stylus SDK v0.10 workspace guide.)
+[profile.release]
+codegen-units = 1
+strip = true
+lto = true
+panic = "abort"
+opt-level = "z"

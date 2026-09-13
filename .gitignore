@@ -1,0 +1,12 @@
+# Rust
+target/
+Cargo.lock
+
+# Node
+node_modules/
+.next/
+.env
+.env.local
+
+# Misc
+.DS_Store
