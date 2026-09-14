@@ -59,3 +59,15 @@ struct PolicyResponse {
     uint256 permittedAmount;
     bytes32 reason;
 }
+
+// Machine-readable PolicyResponse.reason values. Consumers should match
+// against these constants rather than assuming string layout.
+bytes32 constant REASON_OK = "OK";
+bytes32 constant REASON_EXCEEDS_CAPACITY = "EXCEEDS_CAPACITY";
+bytes32 constant REASON_NO_CAPACITY = "NO_CAPACITY";
+bytes32 constant REASON_RESTRICTED = "RESTRICTED";
+bytes32 constant REASON_CORPORATE_ACTION = "CORPORATE_ACTION";
+bytes32 constant REASON_SUSPENDED = "SUSPENDED";
+bytes32 constant REASON_MATURING = "MATURING";
+bytes32 constant REASON_REDEEMABLE = "REDEEMABLE";
+bytes32 constant REASON_REDEEMED = "REDEEMED";
