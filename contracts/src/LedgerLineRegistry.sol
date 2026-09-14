@@ -6,34 +6,46 @@ import {AssetState, Position, LifecycleState} from "./interfaces/LedgerLineTypes
 import {ILedgerLineRegistry} from "./interfaces/ILedgerLineRegistry.sol";
 
 /// @notice Canonical state store for LedgerLine. Holds AssetState (per
-/// assetId) and Position (per assetId + positionId). All writes are
-/// currently admin-gated (Ownable) -- a deliberate, disclosed MVP trust
-/// assumption. This is expected to be replaced by verified external
-/// state/oracle infrastructure later; it is not presented as final.
+/// assetId) and Position (per assetId + positionId). Asset-state writes
+/// are owner-gated; position writes are gated to a single configured
+/// `positionWriter` (intended to be LedgerLineLendingAdapter), settable
+/// only by the owner. This is a deliberate, disclosed MVP trust
+/// assumption, expected to be replaced by verified external state/oracle
+/// infrastructure and more granular authorization later.
 ///
-/// positionId is an opaque identifier chosen by whichever consuming
-/// protocol calls this Registry (e.g. derived from a user address) --
-/// Registry itself has no concept of "users" or debt, keeping it
-/// consumer-agnostic per the locked architecture.
-///
-/// NOTE: setPosition is onlyOwner for Phase 3. Phase 4's lending adapter
-/// will need write access to record deposits -- that access-control
-/// expansion is explicitly deferred to Phase 4, not solved here.
+/// positionId is an opaque identifier chosen by the consuming protocol
+/// (e.g. derived from a user address) -- Registry has no concept of
+/// "users" or debt, keeping it consumer-agnostic.
 contract LedgerLineRegistry is ILedgerLineRegistry, Ownable {
     mapping(uint256 => AssetState) private assetStates;
     mapping(uint256 => bool) private assetInitialized;
     mapping(uint256 => mapping(uint256 => Position)) private positions;
 
+    address public positionWriter;
+
     event AssetInitialized(uint256 indexed assetId, uint256 price, uint256 multiplier);
     event AssetParametersUpdated(uint256 indexed assetId, uint256 price, uint256 multiplier, uint256 collateralFactorBps, uint256 riskAdjustmentBps);
     event LifecycleTransitioned(uint256 indexed assetId, LifecycleState from, LifecycleState to);
     event PositionUpdated(uint256 indexed assetId, uint256 indexed positionId, uint256 rawBalance);
+    event PositionWriterUpdated(address indexed previousWriter, address indexed newWriter);
 
     error AssetAlreadyInitialized(uint256 assetId);
     error AssetNotInitialized(uint256 assetId);
     error InvalidLifecycleTransition(LifecycleState from, LifecycleState to);
+    error NotPositionWriter(address caller);
+
+    modifier onlyPositionWriter() {
+        if (msg.sender != positionWriter) revert NotPositionWriter(msg.sender);
+        _;
+    }
 
     constructor(address initialOwner) Ownable(initialOwner) {}
+
+    function setPositionWriter(address newWriter) external onlyOwner {
+        address previous = positionWriter;
+        positionWriter = newWriter;
+        emit PositionWriterUpdated(previous, newWriter);
+    }
 
     function initializeAsset(
         uint256 assetId,
@@ -86,7 +98,7 @@ contract LedgerLineRegistry is ILedgerLineRegistry, Ownable {
         emit LifecycleTransitioned(assetId, current, newState);
     }
 
-    function setPosition(uint256 assetId, uint256 positionId, uint256 rawBalance) external onlyOwner {
+    function setPosition(uint256 assetId, uint256 positionId, uint256 rawBalance) external onlyPositionWriter {
         positions[assetId][positionId].rawBalance = rawBalance;
         emit PositionUpdated(assetId, positionId, rawBalance);
     }
@@ -99,14 +111,18 @@ contract LedgerLineRegistry is ILedgerLineRegistry, Ownable {
         return positions[assetId][positionId];
     }
 
-    /// @dev Locked transition graph (approved, MATURING -> ACTIVE removed):
-    /// ACTIVE           -> RESTRICTED, CORPORATE_ACTION, SUSPENDED, MATURING
-    /// RESTRICTED       -> ACTIVE, SUSPENDED
+    function isAssetInitialized(uint256 assetId) external view returns (bool) {
+        return assetInitialized[assetId];
+    }
+
+    /// @dev Locked transition graph:
+    /// ACTIVE -> RESTRICTED, CORPORATE_ACTION, SUSPENDED, MATURING
+    /// RESTRICTED -> ACTIVE, SUSPENDED
     /// CORPORATE_ACTION -> ACTIVE, RESTRICTED
-    /// SUSPENDED        -> ACTIVE, RESTRICTED
-    /// MATURING         -> REDEEMABLE
-    /// REDEEMABLE       -> REDEEMED
-    /// REDEEMED         -> (terminal)
+    /// SUSPENDED -> ACTIVE, RESTRICTED
+    /// MATURING -> REDEEMABLE
+    /// REDEEMABLE -> REDEEMED
+    /// REDEEMED -> (terminal)
     function _isValidTransition(LifecycleState from, LifecycleState to) internal pure returns (bool) {
         if (from == LifecycleState.ACTIVE) {
             return to == LifecycleState.RESTRICTED
@@ -129,6 +145,6 @@ contract LedgerLineRegistry is ILedgerLineRegistry, Ownable {
         if (from == LifecycleState.REDEEMABLE) {
             return to == LifecycleState.REDEEMED;
         }
-        return false; // REDEEMED is terminal
+        return false;
     }
 }
