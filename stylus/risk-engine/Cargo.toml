@@ -29,4 +29,5 @@ panic = "abort"
 opt-level = 3
 
 [dev-dependencies]
+proptest = "1.11.0"
 stylus-sdk = { version = "0.10.9", features = ["stylus-test"] }

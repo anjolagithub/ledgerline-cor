@@ -8,6 +8,7 @@ import {LedgerLineLendingAdapter} from "../src/LedgerLineLendingAdapter.sol";
 import {MockStockToken} from "../src/mocks/MockStockToken.sol";
 import {MockBorrowToken} from "../src/mocks/MockBorrowToken.sol";
 import {LifecycleState} from "../src/interfaces/LedgerLineTypes.sol";
+import {StubPositionEngine, StubRiskEngine} from "./mocks/StubEngines.sol";
 
 /// @notice End-to-end demo flow test. Position/Risk engines are Stylus
 /// (WASM) contracts -- they cannot run inside Foundry's EVM test
@@ -101,28 +102,3 @@ contract LedgerLineDemoTest is Test {
     }
 }
 
-// --- Solidity stand-ins for the Stylus engines, matching their exact
-// --- formulas, for fast local EVM testing only. See Phase 2 for the
-// --- real, tested Rust/WASM implementations.
-import {IPositionEngine} from "../src/interfaces/IPositionEngine.sol";
-import {IRiskEngine} from "../src/interfaces/IRiskEngine.sol";
-
-contract StubPositionEngine is IPositionEngine {
-    function computePositionValue(uint256 rawBalance, uint256 price, uint256 multiplier)
-        external
-        pure
-        returns (uint256)
-    {
-        return (rawBalance * price / 1e18) * multiplier / 1e18;
-    }
-}
-
-contract StubRiskEngine is IRiskEngine {
-    function computeBorrowingCapacity(uint256 positionValue, uint256 collateralFactorBps, uint256 riskAdjustmentBps)
-        external
-        pure
-        returns (uint256)
-    {
-        return (positionValue * collateralFactorBps / 10000) * riskAdjustmentBps / 10000;
-    }
-}

@@ -85,3 +85,65 @@ mod tests {
         assert_eq!(capacity, scale(200_000));
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+    use stylus_sdk::testing::*;
+
+    fn bounded_value() -> impl Strategy<Value = u128> {
+        0u128..=1_000_000_000_000_000_000_000_000u128
+    }
+
+    // Valid bps range only -- see SECURITY.md finding: Registry now
+    // enforces this onchain, so out-of-range bps should never reach the
+    // engine in practice. This property documents the engine's own
+    // behavior *within* that valid range.
+    fn bounded_bps() -> impl Strategy<Value = u32> {
+        0u32..=10_000u32
+    }
+
+    proptest! {
+        #[test]
+        fn never_panics(position_value in bounded_value(), collateral_bps in 0u32..=u32::MAX, risk_bps in 0u32..=u32::MAX) {
+            let vm = TestVM::default();
+            let engine = RiskEngine::from(&vm);
+            let _ = engine.compute_borrowing_capacity(
+                U256::from(position_value), U256::from(collateral_bps), U256::from(risk_bps)
+            );
+        }
+
+        #[test]
+        fn zero_collateral_factor_always_zero_capacity(position_value in bounded_value(), risk_bps in bounded_bps()) {
+            let vm = TestVM::default();
+            let engine = RiskEngine::from(&vm);
+            let capacity = engine
+                .compute_borrowing_capacity(U256::from(position_value), U256::ZERO, U256::from(risk_bps))
+                .unwrap();
+            prop_assert_eq!(capacity, U256::ZERO);
+        }
+
+        #[test]
+        fn zero_risk_adjustment_always_zero_capacity(position_value in bounded_value(), collateral_bps in bounded_bps()) {
+            let vm = TestVM::default();
+            let engine = RiskEngine::from(&vm);
+            let capacity = engine
+                .compute_borrowing_capacity(U256::from(position_value), U256::from(collateral_bps), U256::ZERO)
+                .unwrap();
+            prop_assert_eq!(capacity, U256::ZERO);
+        }
+
+        #[test]
+        fn capacity_never_exceeds_position_value_within_valid_bps(
+            position_value in bounded_value(), collateral_bps in bounded_bps(), risk_bps in bounded_bps()
+        ) {
+            let vm = TestVM::default();
+            let engine = RiskEngine::from(&vm);
+            let capacity = engine
+                .compute_borrowing_capacity(U256::from(position_value), U256::from(collateral_bps), U256::from(risk_bps))
+                .unwrap();
+            prop_assert!(capacity <= U256::from(position_value));
+        }
+    }
+}

@@ -88,3 +88,49 @@ mod tests {
         assert_eq!(value, scale(100_000));
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+    use stylus_sdk::testing::*;
+
+    // Bounded strategy avoids the overflow path dominating every case --
+    // we already unit-test that overflow errors gracefully; these
+    // properties are about the non-overflowing region's math.
+    fn bounded() -> impl Strategy<Value = u128> {
+        0u128..=1_000_000_000_000_000_000_000_000u128 // up to 1,000,000 at 18dp
+    }
+
+    proptest! {
+        #[test]
+        fn never_panics(raw_balance in bounded(), price in bounded(), multiplier in bounded()) {
+            // Result::Err is fine (overflow), a panic is not.
+            let vm = TestVM::default();
+            let engine = PositionEngine::from(&vm);
+            let _ = engine.compute_position_value(
+                U256::from(raw_balance), U256::from(price), U256::from(multiplier)
+            );
+        }
+
+        #[test]
+        fn zero_price_always_zero_value(raw_balance in bounded(), multiplier in bounded()) {
+            let vm = TestVM::default();
+            let engine = PositionEngine::from(&vm);
+            let value = engine
+                .compute_position_value(U256::from(raw_balance), U256::ZERO, U256::from(multiplier))
+                .unwrap();
+            prop_assert_eq!(value, U256::ZERO);
+        }
+
+        #[test]
+        fn zero_multiplier_always_zero_value(raw_balance in bounded(), price in bounded()) {
+            let vm = TestVM::default();
+            let engine = PositionEngine::from(&vm);
+            let value = engine
+                .compute_position_value(U256::from(raw_balance), U256::from(price), U256::ZERO)
+                .unwrap();
+            prop_assert_eq!(value, U256::ZERO);
+        }
+    }
+}

@@ -32,6 +32,7 @@ contract LedgerLineRegistry is ILedgerLineRegistry, Ownable {
     error AssetAlreadyInitialized(uint256 assetId);
     error AssetNotInitialized(uint256 assetId);
     error InvalidLifecycleTransition(LifecycleState from, LifecycleState to);
+    error InvalidBps(uint256 bps);
     error NotPositionWriter(address caller);
 
     modifier onlyPositionWriter() {
@@ -55,6 +56,8 @@ contract LedgerLineRegistry is ILedgerLineRegistry, Ownable {
         uint256 riskAdjustmentBps
     ) external onlyOwner {
         if (assetInitialized[assetId]) revert AssetAlreadyInitialized(assetId);
+        if (collateralFactorBps > 10_000) revert InvalidBps(collateralFactorBps);
+        if (riskAdjustmentBps > 10_000) revert InvalidBps(riskAdjustmentBps);
 
         assetStates[assetId] = AssetState({
             price: price,
@@ -76,6 +79,8 @@ contract LedgerLineRegistry is ILedgerLineRegistry, Ownable {
         uint256 riskAdjustmentBps
     ) external onlyOwner {
         if (!assetInitialized[assetId]) revert AssetNotInitialized(assetId);
+        if (collateralFactorBps > 10_000) revert InvalidBps(collateralFactorBps);
+        if (riskAdjustmentBps > 10_000) revert InvalidBps(riskAdjustmentBps);
 
         AssetState storage state = assetStates[assetId];
         state.price = price;
@@ -123,6 +128,11 @@ contract LedgerLineRegistry is ILedgerLineRegistry, Ownable {
     /// MATURING -> REDEEMABLE
     /// REDEEMABLE -> REDEEMED
     /// REDEEMED -> (terminal)
+    /// @notice Public view of the transition table, for external verification/testing.
+    function isValidTransition(LifecycleState from, LifecycleState to) external pure returns (bool) {
+        return _isValidTransition(from, to);
+    }
+
     function _isValidTransition(LifecycleState from, LifecycleState to) internal pure returns (bool) {
         if (from == LifecycleState.ACTIVE) {
             return to == LifecycleState.RESTRICTED
