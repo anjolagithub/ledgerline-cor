@@ -47,7 +47,7 @@ export default function Dashboard() {
     baseCapacity && assetState ? (baseCapacity * assetState.riskAdjustmentBps) / 10000n : undefined;
 
   return (
-    <main className="mx-auto max-w-3xl px-3 md:px-6 py-8 md:py-12 space-y-8">
+    <main className="mx-auto max-w-5xl px-4 md:px-8 py-10 md:py-16 space-y-10">
       <div className="flex items-center justify-between border-b border-terminal-border pb-4">
         <div>
           <Link href="/" className="text-lg font-semibold hover:opacity-80">

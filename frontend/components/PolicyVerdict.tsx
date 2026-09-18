@@ -76,7 +76,7 @@ export function PolicyVerdict({
       )}
 
       <div className="border-t border-terminal-border pt-3 text-center">
-        <div className={`text-3xl font-semibold ${colorClass}`}>{decisionLabel ?? "--"}</div>
+        <div className={`text-4xl font-bold ${colorClass}`}>{decisionLabel ?? "--"}</div>
         {(decisionLabel === "LIMIT" || decisionLabel === "BLOCK") && response && (
           <div className="mt-1 text-xs text-terminal-muted">
             Maximum permitted ${formatUnits18(response.permittedAmount)}

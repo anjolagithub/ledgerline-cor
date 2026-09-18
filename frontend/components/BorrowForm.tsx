@@ -43,8 +43,8 @@ export function BorrowForm({
 
   return (
     <div className="space-y-4">
-      <div className="rounded border border-terminal-border bg-terminal-surface p-4">
-        <div className="text-xs uppercase tracking-wide text-terminal-muted mb-3">Policy Evaluation</div>
+      <div className="rounded-lg border-2 border-terminal-border bg-terminal-surface p-6">
+        <div className="text-xs uppercase tracking-wide text-terminal-muted mb-4 font-medium">Policy Evaluation</div>
 
         <PolicyEquation
           positionValue={positionValue}

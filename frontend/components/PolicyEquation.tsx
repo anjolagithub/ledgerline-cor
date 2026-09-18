@@ -19,7 +19,7 @@ export function PolicyEquation({
     <div className="rounded border border-terminal-border bg-terminal-surface2 p-4 space-y-2">
       <div className="flex items-baseline justify-between">
         <span className="text-xs uppercase tracking-wide text-terminal-muted">Position Value</span>
-        <span className="font-mono tabular-nums text-2xl font-semibold">
+        <span className="font-mono tabular-nums text-3xl font-semibold">
           ${formatUnits18(positionValue)}
         </span>
       </div>
@@ -33,7 +33,7 @@ export function PolicyEquation({
       </div>
       <div className="border-t border-terminal-border pt-2 flex items-baseline justify-between">
         <span className="text-xs uppercase tracking-wide text-terminal-muted">Effective Capacity</span>
-        <span className="font-mono tabular-nums text-2xl font-semibold">
+        <span className="font-mono tabular-nums text-3xl font-semibold">
           ${formatUnits18(effectiveCapacity)}
         </span>
       </div>
