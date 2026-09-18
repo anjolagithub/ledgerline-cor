@@ -76,7 +76,7 @@ export function BorrowForm({
         {tx.status === "wrong-network" ? (
           <button
             onClick={tx.switchToCorrectNetwork}
-            className="w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-white hover:opacity-90"
+            className="w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
           >
             Switch Network
           </button>
@@ -91,7 +91,7 @@ export function BorrowForm({
                 args: [parsedAmount],
               })
             }
-            className="w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-white hover:opacity-90 disabled:opacity-40"
+            className="w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90 disabled:opacity-40"
           >
             {canSubmit ? "Borrow" : "Preview only -- adjust amount"}
           </button>

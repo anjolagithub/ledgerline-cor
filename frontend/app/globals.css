@@ -7,7 +7,10 @@
   --color-terminal-border: #1e2530;
   --color-terminal-text: #e2e8f0;
   --color-terminal-muted: #7b8794;
-  --color-terminal-accent: #3b82f6;
+  --color-terminal-accent: #f4f4f5; /* near-white -- accent is now monochrome, not a generic blue */
+  --color-terminal-accent-fg: #0a0e14; /* text color when sitting on the accent */
+  --font-sans: var(--font-sans, -apple-system, sans-serif);
+  --font-mono: var(--font-mono, ui-monospace, monospace);
 
   --color-decision-allow: #34d399;
   --color-decision-limit: #fbbf24;
@@ -19,5 +22,11 @@
 body {
   background-color: var(--color-terminal-bg);
   color: var(--color-terminal-text);
+  font-family: var(--font-sans);
   font-feature-settings: "tnum";
+  letter-spacing: -0.01em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
 }

@@ -18,7 +18,7 @@ export default function Landing() {
         </p>
         <Link
           href="/app"
-          className="inline-block rounded bg-terminal-accent px-5 py-2.5 text-xs uppercase tracking-wide text-white hover:opacity-90"
+          className="inline-block rounded bg-terminal-accent px-5 py-2.5 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
         >
           Launch App
         </Link>

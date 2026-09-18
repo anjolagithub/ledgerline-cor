@@ -1,3 +1,4 @@
+import { Check, TriangleAlert } from "lucide-react";
 import { DECISION_LABELS, LIFECYCLE_LABELS, formatUnits18 } from "@/lib/contracts";
 
 type PolicyResponse = { decision: number; permittedAmount: bigint; reason: string } | undefined;
@@ -38,17 +39,27 @@ export function PolicyVerdict({
 
   return (
     <div className="space-y-3">
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {isActive ? (
           <>
-            <div className="text-sm">&#10003; Lifecycle: ACTIVE</div>
-            <div className="text-sm">&#10003; Price feed valid</div>
-            <div className="text-sm">&#10003; Position exists</div>
+            <div className="flex items-center gap-2 text-sm">
+              <Check size={14} className="text-decision-allow shrink-0" />
+              Lifecycle: ACTIVE
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Check size={14} className="text-decision-allow shrink-0" />
+              Price feed valid
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Check size={14} className="text-decision-allow shrink-0" />
+              Position exists
+            </div>
           </>
         ) : (
-          <div className="text-sm text-decision-limit">
-            &#9888; Lifecycle: {lifecycle !== undefined ? LIFECYCLE_LABELS[lifecycle] : "--"} -- all
-            actions blocked
+          <div className="flex items-center gap-2 text-sm text-decision-limit">
+            <TriangleAlert size={14} className="shrink-0" />
+            Lifecycle: {lifecycle !== undefined ? LIFECYCLE_LABELS[lifecycle] : "--"} -- all actions
+            blocked
           </div>
         )}
       </div>

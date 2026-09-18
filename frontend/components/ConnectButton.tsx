@@ -21,7 +21,7 @@ export function ConnectButton() {
   return (
     <button
       onClick={() => connect({ connector: connectors[0] })}
-      className="rounded bg-terminal-accent px-3 py-1.5 text-xs uppercase tracking-wide text-white hover:opacity-90"
+      className="rounded bg-terminal-accent px-3 py-1.5 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
     >
       Connect
     </button>

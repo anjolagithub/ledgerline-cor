@@ -84,7 +84,7 @@ export function DepositForm() {
               args: [parsedAmount],
             })
           }
-          className="flex-1 rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-white hover:opacity-90 disabled:opacity-40"
+          className="flex-1 rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90 disabled:opacity-40"
         >
           Deposit
         </button>
