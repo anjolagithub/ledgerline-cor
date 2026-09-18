@@ -9,8 +9,8 @@
   --color-terminal-muted: #7b8794;
   --color-terminal-accent: #f4f4f5; /* near-white -- accent is now monochrome, not a generic blue */
   --color-terminal-accent-fg: #0a0e14; /* text color when sitting on the accent */
-  --font-sans: var(--font-sans, -apple-system, sans-serif);
-  --font-mono: var(--font-mono, ui-monospace, monospace);
+  --font-sans: "Inter", ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
 
   --color-decision-allow: #34d399;
   --color-decision-limit: #fbbf24;
