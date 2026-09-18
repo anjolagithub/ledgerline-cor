@@ -2,193 +2,51 @@ import Link from "next/link";
 import { LandingPolicyDemo } from "@/components/LandingPolicyDemo";
 import { DisabledGitHubLink } from "@/components/DisabledGitHubLink";
 
+const code = `(Decision decision, uint256 permittedAmount, bytes32 reason) =\n    ledgerLine.canExecute(assetId, positionId, Action.BORROW, amount);`;
+
 export default function Landing() {
   return (
-    <main className="mx-auto max-w-3xl px-4 md:px-8 py-16 md:py-24 space-y-24">
-      {/* HERO */}
-      <section className="space-y-6">
-        <div className="text-xs uppercase tracking-wide text-terminal-muted">LedgerLine Core</div>
-        <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
-          Financial policy infrastructure
-          <br />
-          for tokenized assets.
-        </h1>
-        <p className="text-sm text-terminal-muted max-w-xl">
-          Turn asset state, position risk, and lifecycle conditions into
-          enforceable onchain financial decisions.
-        </p>
-        <div className="flex gap-3">
-          <Link
-            href="/app"
-            className="inline-block rounded bg-terminal-accent px-5 py-2.5 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
-          >
-            Explore Core
-          </Link>
-          <a
-            href="#architecture"
-            className="inline-block rounded border border-terminal-border px-5 py-2.5 text-xs uppercase tracking-wide hover:bg-terminal-surface"
-          >
-            View Architecture
-          </a>
+    <main className="mx-auto flex max-w-6xl flex-col gap-24 px-5 py-6 md:px-10 md:py-8">
+      <nav className="flex items-center justify-between border-b border-terminal-border pb-5" aria-label="Primary navigation">
+        <Link href="/" className="font-semibold tracking-tight">LedgerLine <span className="text-terminal-muted">/ Core</span></Link>
+        <div className="flex items-center gap-6 text-xs text-terminal-muted">
+          <a href="#architecture" className="hidden hover:text-terminal-text md:inline">Architecture</a>
+          <Link href="/app" className="border border-terminal-border px-3 py-2 text-terminal-text hover:bg-terminal-surface">Open console <span aria-hidden="true">↗</span></Link>
+        </div>
+      </nav>
+
+      <section className="grid items-end gap-12 border-b border-terminal-border pb-20 md:grid-cols-[1.05fr_.95fr] md:gap-20">
+        <div className="flex flex-col gap-7">
+          <p className="eyebrow">Policy infrastructure / 01</p>
+          <h1 className="max-w-xl text-5xl font-semibold leading-[1.03] tracking-[-0.045em] md:text-7xl">Financial policy infrastructure for tokenized assets.</h1>
+          <p className="max-w-lg text-base leading-7 text-terminal-muted">Turn asset state, position risk, and lifecycle conditions into enforceable onchain financial decisions.</p>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/app" className="bg-terminal-accent px-4 py-3 text-xs font-medium uppercase tracking-wide text-terminal-accent-fg hover:opacity-90">Explore LedgerLine Core</Link>
+            <a href="#architecture" className="border border-terminal-border px-4 py-3 text-xs font-medium uppercase tracking-wide hover:bg-terminal-surface">View architecture</a>
+          </div>
+        </div>
+        <div className="relative">
+          <div className="absolute -left-5 top-1/2 hidden h-px w-5 bg-terminal-border md:block" aria-hidden="true" />
+          <LandingPolicyDemo />
         </div>
       </section>
 
-      {/* LIVE POLICY (moved up, per spec 5.4, strongest section) */}
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Make financial policy executable.</h2>
-        <LandingPolicyDemo />
+      <section className="grid gap-8 border-b border-terminal-border pb-20 md:grid-cols-[.7fr_1.3fr]">
+        <div><p className="eyebrow">The problem / 02</p><h2 className="mt-4 max-w-sm text-3xl font-semibold tracking-tight">Tokenized assets introduce state.</h2></div>
+        <div className="grid gap-10 md:grid-cols-2"><p className="max-w-md text-sm leading-7 text-terminal-muted">A balance and a price are not always enough to determine whether a financial action should execute. Lifecycle, restrictions, corporate actions, and risk conditions change the rules.</p><div className="font-mono text-sm leading-8 text-terminal-muted"><div>BALANCE <span className="text-terminal-border">→</span> STATE</div><div>POSITION <span className="text-terminal-border">→</span> RISK</div><div className="text-terminal-text">POLICY <span className="text-terminal-border">→</span> ACTION</div></div></div>
       </section>
 
-      {/* PROBLEM */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Tokenized assets introduce state.</h2>
-        <p className="text-sm text-terminal-muted max-w-xl leading-relaxed">
-          A token balance and price are not always sufficient for a financial
-          protocol. Lifecycle changes, corporate actions, restrictions, price
-          validity, and position risk can change the conditions under which a
-          financial action should execute.
-        </p>
-        <div className="font-mono text-sm text-terminal-muted space-y-1">
-          <div>Balance</div>
-          <div>&darr;</div>
-          <div>State</div>
-          <div>&darr;</div>
-          <div>Risk</div>
-          <div>&darr;</div>
-          <div>Policy</div>
-          <div>&darr;</div>
-          <div className="text-terminal-text">Action</div>
-        </div>
+      <section id="architecture" className="grid gap-10 border-b border-terminal-border pb-20 scroll-mt-8 md:grid-cols-[.7fr_1.3fr]">
+        <div><p className="eyebrow">The primitive / 03</p><h2 className="mt-4 max-w-sm text-3xl font-semibold tracking-tight">One policy layer. Multiple asset environments.</h2></div>
+        <div className="grid gap-4 font-mono text-sm md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-center"><div className="border border-terminal-border p-4"><span className="text-terminal-muted">INPUT</span><br />Asset environment<br /><span className="text-terminal-muted">Asset adapter</span></div><span className="text-terminal-muted">→</span><div className="bg-terminal-surface2 p-5"><span className="eyebrow">Core engine</span><div className="mt-3 text-lg font-semibold font-sans">LedgerLine Core</div><div className="mt-2 text-xs leading-6 text-terminal-muted">Position<br />Lifecycle<br />Risk<br />Policy</div></div><span className="text-terminal-muted">→</span><div className="border border-terminal-border p-4"><span className="text-terminal-muted">OUTPUT</span><br /><span className="text-decision-allow">ALLOW</span> / <span className="text-decision-limit">LIMIT</span><br /><span className="text-decision-review">REVIEW</span> / <span className="text-decision-block">BLOCK</span></div></div>
       </section>
 
-      {/* PRIMITIVE / ARCHITECTURE */}
-      <section id="architecture" className="space-y-4 scroll-mt-8">
-        <h2 className="text-lg font-semibold">
-          Separate asset state from financial application logic.
-        </h2>
-        <div className="font-mono text-sm space-y-2">
-          <div className="text-terminal-muted">Tokenized Asset</div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="text-terminal-muted">Asset Adapter</div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="rounded border-2 border-terminal-border bg-terminal-surface2 px-4 py-3 inline-block">
-            <div className="text-terminal-text font-semibold mb-1">LedgerLine Core</div>
-            <div className="text-terminal-muted text-xs space-y-0.5">
-              <div>Position</div>
-              <div>Lifecycle</div>
-              <div>Risk</div>
-              <div>Policy</div>
-            </div>
-          </div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div>
-            <span className="text-decision-allow">ALLOW</span>{" "}
-            <span className="text-terminal-muted">/</span>{" "}
-            <span className="text-decision-limit">LIMIT</span>{" "}
-            <span className="text-terminal-muted">/</span>{" "}
-            <span className="text-decision-review">REVIEW</span>{" "}
-            <span className="text-terminal-muted">/</span>{" "}
-            <span className="text-decision-block">BLOCK</span>
-          </div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="text-terminal-muted">Financial Protocol</div>
-        </div>
-        <p className="text-xs text-terminal-muted max-w-xl">
-          Currently implemented: a reference lending protocol
-          (LedgerLineLendingAdapter). Vaults and agent-driven consumers are
-          possible future integrations, not currently built.
-        </p>
+      <section className="grid gap-8 border-b border-terminal-border pb-20 md:grid-cols-[.7fr_1.3fr]">
+        <div><p className="eyebrow">Developer surface / 04</p><h2 className="mt-4 max-w-sm text-3xl font-semibold tracking-tight">A decision protocol, not a dashboard.</h2></div>
+        <div className="grid gap-6 md:grid-cols-[1.2fr_.8fr]"><pre className="overflow-x-auto border border-terminal-border bg-terminal-surface2 p-5 text-xs leading-6 text-terminal-muted"><code>{code}</code></pre><div className="text-sm leading-7 text-terminal-muted"><p><span className="text-decision-allow">ALLOW</span> — execute.</p><p><span className="text-decision-limit">LIMIT</span> — reject and resubmit.</p><p><span className="text-decision-block">BLOCK</span> — prohibited by policy.</p></div></div>
       </section>
 
-      {/* LIFECYCLE */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Lifecycle as a state system.</h2>
-        <div className="font-mono text-xs text-terminal-muted leading-relaxed">
-          <div className="text-terminal-text">ACTIVE</div>
-          <div>├&rarr; RESTRICTED</div>
-          <div>├&rarr; CORPORATE_ACTION</div>
-          <div>├&rarr; SUSPENDED</div>
-          <div>└&rarr; MATURING &rarr; REDEEMABLE &rarr; REDEEMED</div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div className="rounded border border-terminal-border p-3">
-            <div className="text-decision-allow font-medium mb-1">ACTIVE</div>
-            <div className="text-xs text-terminal-muted">Action evaluated normally.</div>
-          </div>
-          <div className="rounded border border-terminal-border p-3">
-            <div className="text-decision-block font-medium mb-1">NON-ACTIVE</div>
-            <div className="text-xs text-terminal-muted">MVP policy blocks all actions.</div>
-          </div>
-        </div>
-      </section>
-
-      {/* CHAIN-AGNOSTIC */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">One policy layer. Multiple asset environments.</h2>
-        <div className="font-mono text-sm space-y-2">
-          <div className="flex gap-3 flex-wrap">
-            <span className="text-terminal-text border border-terminal-border rounded px-2 py-0.5 text-xs">
-              Robinhood Chain
-            </span>
-            <span className="text-terminal-muted border border-dashed border-terminal-border rounded px-2 py-0.5 text-xs">
-              Ethereum (not yet integrated)
-            </span>
-            <span className="text-terminal-muted border border-dashed border-terminal-border rounded px-2 py-0.5 text-xs">
-              Arbitrum (not yet integrated)
-            </span>
-          </div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="text-terminal-muted">Asset Adapters</div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="text-terminal-text">LedgerLine Core</div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="text-terminal-muted">Financial Protocols</div>
-        </div>
-        <p className="text-xs text-terminal-muted max-w-xl">
-          Robinhood Chain is LedgerLine&apos;s initial proving ground, not its
-          boundary.
-        </p>
-      </section>
-
-      {/* DEVELOPER */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Built for protocols to consume directly.</h2>
-        <pre className="rounded border border-terminal-border bg-terminal-surface2 p-4 text-xs font-mono overflow-x-auto">
-{`canExecute(
-    assetId,
-    positionId,
-    action,
-    amount
-)`}
-        </pre>
-        <div className="text-xs text-terminal-muted space-y-1">
-          <div>
-            <span className="text-decision-allow">ALLOW</span> &rarr; execute
-          </div>
-          <div>
-            <span className="text-decision-limit">LIMIT</span> &rarr; reject / resubmit within permitted amount
-          </div>
-          <div>
-            <span className="text-decision-block">BLOCK</span> &rarr; reject
-          </div>
-        </div>
-      </section>
-
-      {/* FINAL CTA */}
-      <section className="space-y-4 border-t border-terminal-border pt-12">
-        <h2 className="text-xl font-semibold max-w-md">
-          Build financial protocols that understand the assets they hold.
-        </h2>
-        <div className="flex gap-3">
-          <Link
-            href="/app"
-            className="inline-block rounded bg-terminal-accent px-5 py-2.5 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
-          >
-            Explore LedgerLine Core
-          </Link>
-          <DisabledGitHubLink />
-        </div>
-      </section>
+      <section className="flex flex-col gap-6 pb-12 md:flex-row md:items-end md:justify-between"><div><p className="eyebrow">Next action / 05</p><h2 className="mt-4 max-w-xl text-4xl font-semibold tracking-tight">Build protocols that understand the assets they hold.</h2></div><div className="flex gap-3"><Link href="/app" className="bg-terminal-accent px-4 py-3 text-xs font-medium uppercase tracking-wide text-terminal-accent-fg">Explore Core</Link><DisabledGitHubLink /></div></section>
     </main>
   );
 }
