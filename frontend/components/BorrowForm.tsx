@@ -23,22 +23,36 @@ export function BorrowForm({
 }) {
   const { address } = useAccount();
   const [amount, setAmount] = useState("");
-  const parsedAmount = amount ? BigInt(Math.floor(Number(amount))) * ONE : 0n;
+  const parsedAmount = amount && Number.isFinite(Number(amount))
+    ? BigInt(Math.max(0, Math.floor(Number(amount)))) * ONE
+    : 0n;
   const positionId = address ? BigInt(address) : 0n;
 
-  // Existing data source, unchanged -- same canExecute call that
-  // previously lived directly in this component.
-  const { data: response } = useReadContract({
+  const policyRead = useReadContract({
     address: POLICY.address,
     abi: POLICY.abi,
     functionName: "canExecute",
     args: [ASSET_ID, positionId, 0, parsedAmount], // Action.BORROW = 0
     query: { enabled: !!address && parsedAmount > 0n },
-  }) as { data: { decision: number; permittedAmount: bigint; reason: string } | undefined };
+  });
+  const response = policyRead.data as { decision: number; permittedAmount: bigint; reason: string } | undefined;
+  const isEvaluating = policyRead.isLoading;
+  const evaluationError = policyRead.error;
 
   const tx = useTransactionFlow();
   const decisionLabel = response ? ["ALLOW", "LIMIT", "REVIEW", "BLOCK"][response.decision] : undefined;
   const canSubmit = decisionLabel === "ALLOW";
+  const hasAmount = parsedAmount > 0n;
+  const isReady = !!address && hasAmount && !isEvaluating && !!response;
+  const evaluationMessage = !address
+    ? "Connect a wallet to evaluate this position."
+    : !hasAmount
+    ? "Enter an amount to evaluate a borrow request."
+    : isEvaluating
+    ? "Reading the current policy…"
+    : evaluationError
+    ? "Policy unavailable. Check the network and contract configuration."
+    : undefined;
   const submitting = tx.status === "wallet-confirmation" || tx.status === "pending";
 
   return (
@@ -54,7 +68,13 @@ export function BorrowForm({
         />
 
         <div className="mt-4">
-          <PolicyVerdict requestedAmount={parsedAmount} lifecycle={lifecycle} response={response} />
+          {evaluationMessage ? (
+            <div className="border border-terminal-border bg-terminal-bg px-4 py-4 text-sm text-terminal-muted" role="status">
+              {evaluationMessage}
+            </div>
+          ) : (
+            <PolicyVerdict requestedAmount={parsedAmount} lifecycle={lifecycle} response={response} />
+          )}
         </div>
       </div>
 
@@ -68,11 +88,16 @@ export function BorrowForm({
         <input
           id="borrow-amount"
           type="number"
+          min="0"
+          step="1"
+          inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder="0"
+          placeholder="100000"
+          aria-describedby="borrow-help"
           className="w-full rounded border border-terminal-border bg-terminal-bg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-terminal-accent"
         />
+        <p id="borrow-help" className="mb-3 text-xs text-terminal-muted">Policy is evaluated before any transaction is sent.</p>
         {tx.status === "wrong-network" ? (
           <button
             onClick={tx.switchToCorrectNetwork}
@@ -82,7 +107,7 @@ export function BorrowForm({
           </button>
         ) : (
           <button
-            disabled={!address || !canSubmit || submitting}
+            disabled={!isReady || !canSubmit || submitting}
             onClick={() =>
               tx.execute({
                 address: LENDING_ADAPTER.address,
