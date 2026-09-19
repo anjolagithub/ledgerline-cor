@@ -19,4 +19,16 @@ export const robinhoodChainTestnet = defineChain({
   testnet: true,
 });
 
-export const localChain = foundry;
+// Arbitrum Nitro dev-mode chain ID -- confirmed live from the actual
+// nitro-devnode startup log ("Chain ID: 412346"), not assumed.
+export const nitroDevnode = defineChain({
+  id: 412346,
+  name: "Nitro Dev Node",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: { http: [process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8547"] },
+  },
+  testnet: true,
+});
+
+export const localChain = nitroDevnode;

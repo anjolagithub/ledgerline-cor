@@ -11,7 +11,7 @@ export const config = createConfig({
   chains: [localChain, robinhoodChainTestnet],
   connectors: [injected()],
   transports: {
-    [localChain.id]: http(process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8545"),
+    [localChain.id]: http(process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8547"),
     [robinhoodChainTestnet.id]: http(process.env.NEXT_PUBLIC_RPC_URL ?? ""),
   },
 });

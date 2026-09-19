@@ -5,8 +5,6 @@ The programmable position, risk and policy layer for tokenized real-world assets
 Built for the Arbitrum Open House Singapore online buildathon.
 First deep integration and proving ground: Robinhood Chain Stock Tokens.
 
-> Note: this is a separate project from the unrelated `ledgerline` repo
-> (a credit-scoring/attestation protocol) elsewhere in this workspace.
 
 ## Repo layout
 
