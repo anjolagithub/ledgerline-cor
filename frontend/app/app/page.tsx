@@ -49,7 +49,7 @@ export default function Dashboard() {
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-6 md:px-10 md:py-8">
       <header className="flex items-center justify-between border-b border-terminal-border pb-5">
-        <div className="flex items-center gap-5"><Link href="/" className="font-semibold tracking-tight">LedgerLine <span className="text-terminal-muted">/ Core</span></Link><span className="hidden border-l border-terminal-border pl-5 text-[11px] uppercase tracking-[.16em] text-terminal-muted md:inline">Operator console</span></div>
+        <div className="flex items-center gap-5"><Link href="/" className="font-semibold tracking-tight">LedgerLine Core</Link><span className="hidden border-l border-terminal-border pl-5 text-[11px] uppercase tracking-[.16em] text-terminal-muted md:inline">Operator console</span></div>
         <div className="flex items-center gap-4"><span className="hidden text-[11px] uppercase tracking-[.16em] text-terminal-muted md:inline">Robinhood Chain · Testnet</span><ConnectButton /></div>
       </header>
 
