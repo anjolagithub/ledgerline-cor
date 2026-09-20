@@ -48,6 +48,14 @@ body {
 .brand-mark::after { width: 12px; transform: translateY(6px); }
 .brand-mark span { width: 12px; transform: translateY(-6px); }
 .model-strip { background: linear-gradient(90deg, rgba(255,112,88,.07), transparent 65%); }
+.hero-proof-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 30rem; margin-top: .5rem; border-top: 1px solid rgba(145,165,189,.18); border-bottom: 1px solid rgba(145,165,189,.18); }
+.hero-proof-grid > div { display: flex; min-width: 0; flex-direction: column; gap: .35rem; padding: .9rem .85rem .9rem 0; }
+.hero-proof-grid > div + div { border-left: 1px solid rgba(145,165,189,.18); padding-left: .85rem; }
+.hero-proof-grid strong { color: var(--color-terminal-text); font-family: var(--font-mono); font-size: 1.25rem; font-weight: 500; letter-spacing: -.04em; }
+.hero-proof-grid span { color: var(--color-terminal-muted); font-family: var(--font-mono); font-size: .56rem; letter-spacing: .08em; line-height: 1.45; text-transform: uppercase; }
+.section-kicker { display: inline-flex; align-items: center; gap: .6rem; }
+.section-kicker::before { width: 1.5rem; height: 1px; background: var(--color-terminal-accent); content: ""; }
+@media (max-width: 480px) { .hero-proof-grid span { font-size: .5rem; } .hero-proof-grid > div { padding-right: .55rem; } .hero-proof-grid > div + div { padding-left: .55rem; } }
 .site-shell { position: relative; }
 .site-shell::before { position: fixed; inset: 0; z-index: -2; background: radial-gradient(circle at 76% 13%, rgba(255,112,88,.08), transparent 25%), radial-gradient(circle at 8% 47%, rgba(82,224,162,.035), transparent 23%); content: ""; pointer-events: none; }
 .feature-section { position: relative; }
