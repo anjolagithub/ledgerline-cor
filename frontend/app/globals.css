@@ -29,7 +29,7 @@ body {
 .font-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .eyebrow { color: var(--color-terminal-accent); font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .16em; line-height: 1.5; text-transform: uppercase; }
 .grid-bg { background-image: linear-gradient(rgba(145,165,189,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(145,165,189,.055) 1px, transparent 1px); background-size: 32px 32px; }
-.hero-grid { background-image: linear-gradient(rgba(145,165,189,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(145,165,189,.045) 1px, transparent 1px); background-size: 40px 40px; }
+.hero-grid { background-image: linear-gradient(rgba(145,165,189,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(145,165,189,.045) 1px, transparent 1px); background-size: 40px 40px; mask-image: linear-gradient(to bottom, black 0%, rgba(0,0,0,.82) 62%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 0%, rgba(0,0,0,.82) 62%, transparent 100%); }
 .hero-grid > div:last-child { filter: drop-shadow(0 24px 48px rgba(0,0,0,.22)); }
 .demo-index { color: color-mix(in srgb, var(--color-terminal-muted) 80%, var(--color-terminal-accent)); }
 .glass-nav { position: sticky; isolation: isolate; border: 1px solid rgba(145,165,189,.18); background: linear-gradient(115deg, rgba(17,36,59,.78), rgba(7,17,31,.58) 55%, rgba(255,112,88,.06)); box-shadow: 0 16px 40px rgba(0,0,0,.22), inset 0 1px 0 rgba(238,245,255,.08), inset 0 -1px 0 rgba(145,165,189,.06); backdrop-filter: blur(22px) saturate(135%); -webkit-backdrop-filter: blur(22px) saturate(135%); }
