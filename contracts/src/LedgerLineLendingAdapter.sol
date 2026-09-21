@@ -44,14 +44,19 @@ contract LedgerLineLendingAdapter is Ownable {
     uint8 public immutable borrowTokenDecimals;
 
     mapping(address => uint256) public debt;
+    mapping(address => bool) public isAuthorizedReleaser;
 
     event Deposited(address indexed user, uint256 amount, uint256 newRawBalance);
     event Borrowed(address indexed user, uint256 amount, uint256 newDebt);
+    event Released(address indexed user, uint256 amount, uint256 newRawBalance, address indexed releaser);
+    event ReleaserUpdated(address indexed releaser, bool authorized);
 
     error AssetNotInitialized();
     error NoPosition();
     error PolicyBlocked(bytes32 reason);
     error ExceedsPermittedAmount(uint256 wouldOweTotal, uint256 permittedAmount);
+    error NotAuthorizedReleaser(address caller);
+    error InsufficientPosition(uint256 requested, uint256 available);
 
     constructor(
         address initialOwner,
@@ -71,6 +76,39 @@ contract LedgerLineLendingAdapter is Ownable {
 
     function _positionId(address user) internal pure returns (uint256) {
         return uint256(uint160(user));
+    }
+
+    /// @notice Owner-controlled allowlist of contracts permitted to
+    /// trigger a custody release via releaseCollateral. Intended for
+    /// other LedgerLine consumers (e.g. VaultAdapter) that make their
+    /// own independent Policy.canExecute() decision and, only after
+    /// ALLOW, need this adapter's already-custodied tokens released --
+    /// centralizing custody here rather than duplicating token
+    /// transfers across every consumer contract.
+    function setAuthorizedReleaser(address releaser, bool authorized) external onlyOwner {
+        isAuthorizedReleaser[releaser] = authorized;
+        emit ReleaserUpdated(releaser, authorized);
+    }
+
+    /// @notice Releases previously-deposited collateral back to `user`
+    /// and updates the shared Registry position accordingly. Callable
+    /// ONLY by an authorized releaser (e.g. VaultAdapter) -- this
+    /// adapter does not itself evaluate policy here; the caller is
+    /// expected to have already called Policy.canExecute() with
+    /// Action.WITHDRAW and confirmed ALLOW before calling this.
+    function releaseCollateral(address user, uint256 amount) external {
+        if (!isAuthorizedReleaser[msg.sender]) revert NotAuthorizedReleaser(msg.sender);
+
+        uint256 positionId = _positionId(user);
+        uint256 currentRawBalance = registry.getPosition(assetId, positionId).rawBalance;
+        if (amount > currentRawBalance) revert InsufficientPosition(amount, currentRawBalance);
+
+        uint256 newRawBalance = currentRawBalance - amount;
+        registry.setPosition(assetId, positionId, newRawBalance);
+
+        collateralToken.safeTransfer(user, amount);
+
+        emit Released(user, amount, newRawBalance, msg.sender);
     }
 
     /// @dev Converts an 18-decimal internal amount to the borrow token's

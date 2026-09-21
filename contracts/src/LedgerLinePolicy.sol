@@ -55,8 +55,6 @@ contract LedgerLinePolicy is ILedgerLinePolicy, Ownable {
         Action action,
         uint256 amount
     ) external view returns (PolicyResponse memory response) {
-        action; // reserved for future per-action differentiation, unused in MVP
-
         AssetState memory asset = registry.getAssetState(assetId);
 
         if (asset.lifecycle != LifecycleState.ACTIVE) {
@@ -68,6 +66,22 @@ contract LedgerLinePolicy is ILedgerLinePolicy, Ownable {
         }
 
         Position memory position = registry.getPosition(assetId, positionId);
+
+        // WITHDRAW is a lifecycle question, not a capacity question --
+        // redeeming your own already-deposited collateral has no
+        // natural relationship to borrowing capacity. Lifecycle is
+        // already confirmed ACTIVE above, so redemption up to your
+        // full recorded position is always permitted. This is the
+        // real per-action differentiation the original MVP comment
+        // deferred -- added when Phase 10 (VaultAdapter) needed it,
+        // not invented speculatively.
+        if (action == Action.WITHDRAW) {
+            return PolicyResponse({
+                decision: Decision.ALLOW,
+                permittedAmount: position.rawBalance,
+                reason: REASON_OK
+            });
+        }
 
         uint256 positionValue = positionEngine.computePositionValue(
             position.rawBalance,
