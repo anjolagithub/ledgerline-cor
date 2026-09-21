@@ -2,193 +2,42 @@ import Link from "next/link";
 import { LandingPolicyDemo } from "@/components/LandingPolicyDemo";
 import { DisabledGitHubLink } from "@/components/DisabledGitHubLink";
 
+const code = `(Decision decision, uint256 permittedAmount, bytes32 reason) =
+    ledgerLine.canExecute(assetId, positionId, Action.BORROW, amount);`;
+
+const decisions = [
+  ["ALLOW", "The action can execute.", "text-decision-allow"],
+  ["LIMIT", "The amount must be adjusted and resubmitted.", "text-decision-limit"],
+  ["REVIEW", "Additional conditions need attention.", "text-decision-review"],
+  ["BLOCK", "The action is prohibited by policy.", "text-decision-block"],
+];
+
 export default function Landing() {
   return (
-    <main className="mx-auto max-w-3xl px-4 md:px-8 py-16 md:py-24 space-y-24">
-      {/* HERO */}
-      <section className="space-y-6">
-        <div className="text-xs uppercase tracking-wide text-terminal-muted">LedgerLine Core</div>
-        <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
-          Financial policy infrastructure
-          <br />
-          for tokenized assets.
-        </h1>
-        <p className="text-sm text-terminal-muted max-w-xl">
-          Turn asset state, position risk, and lifecycle conditions into
-          enforceable onchain financial decisions.
-        </p>
-        <div className="flex gap-3">
-          <Link
-            href="/app"
-            className="inline-block rounded bg-terminal-accent px-5 py-2.5 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
-          >
-            Explore Core
-          </Link>
-          <a
-            href="#architecture"
-            className="inline-block rounded border border-terminal-border px-5 py-2.5 text-xs uppercase tracking-wide hover:bg-terminal-surface"
-          >
-            View Architecture
-          </a>
-        </div>
+    <main className="site-shell mx-auto flex max-w-7xl flex-col px-4 sm:px-6 md:px-10">
+      <nav className="glass-nav sticky top-3 z-50 mx-auto flex min-h-14 w-full items-center justify-between rounded-2xl px-3 py-2.5 sm:top-4 sm:min-h-16 sm:px-4 sm:py-3 md:px-5" aria-label="Primary navigation">
+        <Link href="/" className="flex min-w-0 items-center gap-3 font-semibold tracking-tight"><span className="brand-mark" aria-hidden="true"><span className="brand-mark-line brand-mark-line-a" /><span className="brand-mark-line brand-mark-line-b" /><span className="brand-mark-line brand-mark-line-c" /></span><span className="truncate text-[13px] sm:text-base">LedgerLine</span><span className="hidden rounded-full border border-terminal-border/80 bg-terminal-bg/30 px-2.5 py-1 font-mono text-[9px] font-normal tracking-normal text-terminal-muted sm:inline"><span className="mr-1.5 text-terminal-accent">●</span>v1.0-testbed</span></Link>
+        <div className="flex items-center gap-2 text-xs text-terminal-muted md:gap-5"><div className="hidden items-center gap-5 lg:flex"><a href="#product" className="nav-link transition-colors hover:text-terminal-text">Core primitive</a><a href="#architecture" className="nav-link transition-colors hover:text-terminal-text">Architecture</a><a href="#developer" className="nav-link transition-colors hover:text-terminal-text">Docs</a><a href="https://github.com/anjolagithub/ledgerline-cor" target="_blank" rel="noreferrer" className="nav-link transition-colors hover:text-terminal-text">GitHub</a></div><details className="mobile-nav-menu"><summary className="glass-menu rounded-lg p-2 text-terminal-muted" aria-label="Toggle navigation"><span className="sr-only menu-label">Open navigation</span><span className="sr-only menu-close">Close navigation</span><span className="menu-icon" aria-hidden="true"><i /><i /><i /></span></summary><div className="mobile-nav-panel"><a href="#product">Core primitive</a><a href="#architecture">Architecture</a><a href="#developer">Docs</a><a href="https://github.com/anjolagithub/ledgerline-cor" target="_blank" rel="noreferrer">GitHub</a></div></details><span className="hidden rounded-full border border-terminal-border/70 bg-terminal-bg/25 px-2.5 py-1 font-mono text-[10px] text-terminal-muted xl:inline"><span className="mr-1.5 text-decision-allow">●</span>Network ready</span><Link href="/app" className="glass-cta rounded-xl px-3.5 py-2.5 text-[10px] font-semibold uppercase tracking-[.12em] text-terminal-text transition-transform hover:-translate-y-0.5 hover:text-terminal-accent sm:px-4">Open Core <span aria-hidden="true">→</span></Link></div>
+      </nav>
+
+      <section id="product" className="hero-grid relative grid scroll-mt-24 items-center gap-10 border-b border-terminal-border py-10 md:grid-cols-[.82fr_1.18fr] md:gap-12 md:py-16 lg:py-20">
+        <div className="flex flex-col gap-7"><div className="flex items-center gap-3"><span className="eyebrow">Core policy engine</span><span className="h-px w-10 bg-terminal-accent" /></div><h1 className="max-w-2xl text-[3.2rem] font-semibold leading-[.94] tracking-[-.065em] sm:text-6xl md:text-7xl lg:text-[5.35rem]">The decision layer for <span className="text-terminal-accent">serious finance.</span></h1><p className="max-w-lg text-lg leading-8 text-terminal-muted">LedgerLine checks the asset, its current state, the position and the requested action — then returns a clear decision before value moves.</p><div className="flex flex-wrap gap-3"><Link href="/app" className="primary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] text-terminal-accent-fg transition-transform hover:-translate-y-0.5">Explore Core <span aria-hidden="true">→</span></Link><a href="#architecture" className="secondary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] transition-colors hover:bg-terminal-surface">See the model</a></div><div className="flex items-center gap-3 pt-1 font-mono text-[10px] text-terminal-muted"><span className="size-1.5 rounded-full bg-decision-allow" /> deterministic by design <span className="text-terminal-border">/</span> composable by default</div><div className="hero-proof-grid"><div><strong>4</strong><span>policy outcomes</span></div><div><strong>1</strong><span>decision surface</span></div><div><strong>0</strong><span>ambiguous states</span></div></div></div>
+        <div className="relative md:pt-4"><span className="demo-index absolute -top-7 right-0 font-mono text-[10px] tracking-[.16em] text-terminal-muted md:top-0">LIVE POLICY SIMULATION</span><LandingPolicyDemo /></div>
       </section>
 
-      {/* LIVE POLICY (moved up, per spec 5.4, strongest section) */}
-      <section>
-        <h2 className="text-lg font-semibold mb-4">Make financial policy executable.</h2>
-        <LandingPolicyDemo />
-      </section>
+      <section className="model-strip border-b border-terminal-border py-7 md:py-8"><div className="eyebrow mb-4">Every decision follows the same path</div><div className="flex flex-wrap items-center gap-x-4 gap-y-3 font-mono text-sm md:text-base"><span>ASSET</span><span className="text-terminal-accent">→</span><span>STATE</span><span className="text-terminal-accent">→</span><span>POSITION</span><span className="text-terminal-accent">→</span><span>RISK</span><span className="text-terminal-accent">→</span><span className="text-terminal-text">POLICY</span><span className="text-terminal-accent">→</span><span className="text-terminal-text">ACTION</span></div></section>
 
-      {/* PROBLEM */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Tokenized assets introduce state.</h2>
-        <p className="text-sm text-terminal-muted max-w-xl leading-relaxed">
-          A token balance and price are not always sufficient for a financial
-          protocol. Lifecycle changes, corporate actions, restrictions, price
-          validity, and position risk can change the conditions under which a
-          financial action should execute.
-        </p>
-        <div className="font-mono text-sm text-terminal-muted space-y-1">
-          <div>Balance</div>
-          <div>&darr;</div>
-          <div>State</div>
-          <div>&darr;</div>
-          <div>Risk</div>
-          <div>&darr;</div>
-          <div>Policy</div>
-          <div>&darr;</div>
-          <div className="text-terminal-text">Action</div>
-        </div>
-      </section>
+      <section className="feature-section grid gap-8 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">The missing layer</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">A balance and a price are not the whole story.</h2></div><div className="grid gap-8 md:grid-cols-2"><p className="max-w-md text-base leading-8 text-terminal-muted">Tokenized assets introduce state. Lifecycle changes, restrictions, corporate actions and risk conditions can all change whether a financial action should execute.</p><div className="signal-card font-mono text-sm leading-9 text-terminal-muted"><div>BALANCE <span className="text-terminal-border">+</span> STATE</div><div>POSITION <span className="text-terminal-border">+</span> RISK</div><div className="text-terminal-text">POLICY <span className="text-terminal-border">→</span> ACTION</div></div></div></section>
 
-      {/* PRIMITIVE / ARCHITECTURE */}
-      <section id="architecture" className="space-y-4 scroll-mt-8">
-        <h2 className="text-lg font-semibold">
-          Separate asset state from financial application logic.
-        </h2>
-        <div className="font-mono text-sm space-y-2">
-          <div className="text-terminal-muted">Tokenized Asset</div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="text-terminal-muted">Asset Adapter</div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="rounded border-2 border-terminal-border bg-terminal-surface2 px-4 py-3 inline-block">
-            <div className="text-terminal-text font-semibold mb-1">LedgerLine Core</div>
-            <div className="text-terminal-muted text-xs space-y-0.5">
-              <div>Position</div>
-              <div>Lifecycle</div>
-              <div>Risk</div>
-              <div>Policy</div>
-            </div>
-          </div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div>
-            <span className="text-decision-allow">ALLOW</span>{" "}
-            <span className="text-terminal-muted">/</span>{" "}
-            <span className="text-decision-limit">LIMIT</span>{" "}
-            <span className="text-terminal-muted">/</span>{" "}
-            <span className="text-decision-review">REVIEW</span>{" "}
-            <span className="text-terminal-muted">/</span>{" "}
-            <span className="text-decision-block">BLOCK</span>
-          </div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="text-terminal-muted">Financial Protocol</div>
-        </div>
-        <p className="text-xs text-terminal-muted max-w-xl">
-          Currently implemented: a reference lending protocol
-          (LedgerLineLendingAdapter). Vaults and agent-driven consumers are
-          possible future integrations, not currently built.
-        </p>
-      </section>
+      <section id="architecture" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">The primitive</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">One policy layer. Any asset environment.</h2><p className="mt-5 max-w-sm text-sm leading-7 text-terminal-muted">Asset-specific state stays at the edge. Financial policy stays consistent at the core.</p></div><div className="architecture-flow"><div className="flow-node"><span className="eyebrow">Input</span><strong>Asset environment</strong><small>Asset adapter</small></div><span className="flow-arrow">→</span><div className="flow-node flow-core"><span className="eyebrow">Decision engine</span><strong>LedgerLine Core</strong><small>Position · Lifecycle · Risk · Policy</small></div><span className="flow-arrow">→</span><div className="flow-node"><span className="eyebrow">Output</span><strong>Financial action</strong><small>ALLOW · LIMIT · REVIEW · BLOCK</small></div></div></section>
 
-      {/* LIFECYCLE */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Lifecycle as a state system.</h2>
-        <div className="font-mono text-xs text-terminal-muted leading-relaxed">
-          <div className="text-terminal-text">ACTIVE</div>
-          <div>├&rarr; RESTRICTED</div>
-          <div>├&rarr; CORPORATE_ACTION</div>
-          <div>├&rarr; SUSPENDED</div>
-          <div>└&rarr; MATURING &rarr; REDEEMABLE &rarr; REDEEMED</div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div className="rounded border border-terminal-border p-3">
-            <div className="text-decision-allow font-medium mb-1">ACTIVE</div>
-            <div className="text-xs text-terminal-muted">Action evaluated normally.</div>
-          </div>
-          <div className="rounded border border-terminal-border p-3">
-            <div className="text-decision-block font-medium mb-1">NON-ACTIVE</div>
-            <div className="text-xs text-terminal-muted">MVP policy blocks all actions.</div>
-          </div>
-        </div>
-      </section>
+      <section className="feature-section grid gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">State matters</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">When the asset changes, the policy changes with it.</h2></div><div className="state-story"><div><span className="eyebrow">Lifecycle</span><div className="mt-4 font-mono text-2xl">ACTIVE <span className="text-terminal-accent">→</span> RESTRICTED</div></div><div className="state-result"><span className="font-mono text-xs text-terminal-muted">BORROW REQUEST · $100,000</span><strong className="text-decision-block">BLOCK</strong><p>Asset state does not permit this action.</p></div></div></section>
 
-      {/* CHAIN-AGNOSTIC */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">One policy layer. Multiple asset environments.</h2>
-        <div className="font-mono text-sm space-y-2">
-          <div className="flex gap-3 flex-wrap">
-            <span className="text-terminal-text border border-terminal-border rounded px-2 py-0.5 text-xs">
-              Robinhood Chain
-            </span>
-            <span className="text-terminal-muted border border-dashed border-terminal-border rounded px-2 py-0.5 text-xs">
-              Ethereum (not yet integrated)
-            </span>
-            <span className="text-terminal-muted border border-dashed border-terminal-border rounded px-2 py-0.5 text-xs">
-              Arbitrum (not yet integrated)
-            </span>
-          </div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="text-terminal-muted">Asset Adapters</div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="text-terminal-text">LedgerLine Core</div>
-          <div className="text-terminal-muted">&darr;</div>
-          <div className="text-terminal-muted">Financial Protocols</div>
-        </div>
-        <p className="text-xs text-terminal-muted max-w-xl">
-          Robinhood Chain is LedgerLine&apos;s initial proving ground, not its
-          boundary.
-        </p>
-      </section>
+      <section id="developer" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">For developers</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">A decision protocol, not another dashboard.</h2></div><div className="grid gap-6 md:grid-cols-[1.2fr_.8fr]"><pre className="code-card overflow-x-auto p-6 text-xs leading-7 text-terminal-muted"><code>{code}</code></pre><div className="decision-list grid gap-4 text-sm leading-6 text-terminal-muted">{decisions.map(([name, description, color]) => <p key={name}><span className={`font-mono ${color}`}>{name}</span><br />{description}</p>)}</div></div></section>
 
-      {/* DEVELOPER */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Built for protocols to consume directly.</h2>
-        <pre className="rounded border border-terminal-border bg-terminal-surface2 p-4 text-xs font-mono overflow-x-auto">
-{`canExecute(
-    assetId,
-    positionId,
-    action,
-    amount
-)`}
-        </pre>
-        <div className="text-xs text-terminal-muted space-y-1">
-          <div>
-            <span className="text-decision-allow">ALLOW</span> &rarr; execute
-          </div>
-          <div>
-            <span className="text-decision-limit">LIMIT</span> &rarr; reject / resubmit within permitted amount
-          </div>
-          <div>
-            <span className="text-decision-block">BLOCK</span> &rarr; reject
-          </div>
-        </div>
-      </section>
+      <section className="flex flex-col gap-7 py-20 md:flex-row md:items-end md:justify-between md:py-24"><div><p className="eyebrow">Build with conviction</p><h2 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">Make every financial action explainable.</h2></div><div className="flex gap-3"><Link href="/app" className="primary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em]">Explore Core →</Link><DisabledGitHubLink /></div></section>
 
-      {/* FINAL CTA */}
-      <section className="space-y-4 border-t border-terminal-border pt-12">
-        <h2 className="text-xl font-semibold max-w-md">
-          Build financial protocols that understand the assets they hold.
-        </h2>
-        <div className="flex gap-3">
-          <Link
-            href="/app"
-            className="inline-block rounded bg-terminal-accent px-5 py-2.5 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
-          >
-            Explore LedgerLine Core
-          </Link>
-          <DisabledGitHubLink />
-        </div>
-      </section>
+      <footer className="flex flex-col gap-5 border-t border-terminal-border py-7 text-xs text-terminal-muted sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><span className="brand-mark brand-mark-small" aria-hidden="true"><span className="brand-mark-line brand-mark-line-a" /><span className="brand-mark-line brand-mark-line-b" /><span className="brand-mark-line brand-mark-line-c" /></span><span>LedgerLine</span></div><div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[.12em]"><a href="#product" className="transition-colors hover:text-terminal-text">Product</a><a href="#architecture" className="transition-colors hover:text-terminal-text">Architecture</a><a href="#developer" className="transition-colors hover:text-terminal-text">Developers</a><span className="text-terminal-border">v1.0 testbed</span></div></footer>
     </main>
   );
 }

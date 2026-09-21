@@ -1,81 +1,11 @@
-"use client";
-
-import { useAccount, useReadContract } from "wagmi";
 import Link from "next/link";
-import { ConnectButton } from "@/components/ConnectButton";
-import { LifecycleBadge } from "@/components/LifecycleBadge";
-import { DepositForm } from "@/components/DepositForm";
-import { BorrowForm } from "@/components/BorrowForm";
-import { REGISTRY, ASSET_ID } from "@/lib/contracts";
+import { PolicyConsole } from "@/components/PolicyConsole";
 
 export default function Dashboard() {
-  const { address } = useAccount();
-  const positionId = address ? BigInt(address) : 0n;
-
-  const { data: assetState } = useReadContract({
-    address: REGISTRY.address,
-    abi: REGISTRY.abi,
-    functionName: "getAssetState",
-    args: [ASSET_ID],
-  }) as {
-    data:
-      | {
-          price: bigint;
-          multiplier: bigint;
-          lifecycle: number;
-          collateralFactorBps: bigint;
-          riskAdjustmentBps: bigint;
-        }
-      | undefined;
-  };
-
-  const { data: position } = useReadContract({
-    address: REGISTRY.address,
-    abi: REGISTRY.abi,
-    functionName: "getPosition",
-    args: [ASSET_ID, positionId],
-    query: { enabled: !!address },
-  }) as { data: { rawBalance: bigint } | undefined };
-
-  const positionValue =
-    position && assetState ? (position.rawBalance * assetState.price) / 10n ** 18n : undefined;
-
-  const baseCapacity =
-    positionValue && assetState ? (positionValue * assetState.collateralFactorBps) / 10000n : undefined;
-
-  const effectiveCapacity =
-    baseCapacity && assetState ? (baseCapacity * assetState.riskAdjustmentBps) / 10000n : undefined;
-
-  return (
-    <main className="mx-auto max-w-5xl px-4 md:px-8 py-10 md:py-16 space-y-10">
-      <div className="flex items-center justify-between border-b border-terminal-border pb-4">
-        <div>
-          <Link href="/" className="text-lg font-semibold hover:opacity-80">
-            LedgerLine Core
-          </Link>
-          <div className="text-xs text-terminal-muted">Robinhood Chain</div>
-        </div>
-        <ConnectButton />
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-sm text-terminal-muted">Stock Token</div>
-          <div className="text-xl font-semibold">AAPL / Asset #{ASSET_ID.toString()}</div>
-        </div>
-        <LifecycleBadge lifecycle={assetState?.lifecycle} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <DepositForm />
-        <BorrowForm
-          positionValue={positionValue}
-          collateralFactorBps={assetState?.collateralFactorBps}
-          riskAdjustmentBps={assetState?.riskAdjustmentBps}
-          effectiveCapacity={effectiveCapacity}
-          lifecycle={assetState?.lifecycle}
-        />
-      </div>
-    </main>
-  );
+  return <main className="mx-auto flex max-w-6xl flex-col gap-8 px-5 py-6 md:px-10 md:py-8">
+    <header className="flex items-center justify-between border-b border-terminal-border pb-5"><div className="flex min-w-0 items-center gap-4 sm:gap-5"><Link href="/" className="flex items-center gap-2 font-semibold tracking-tight"><span aria-hidden="true" className="text-terminal-accent">←</span><span>LedgerLine Core</span></Link><span className="hidden border-l border-terminal-border pl-5 text-[11px] uppercase tracking-[.16em] text-terminal-muted md:inline">Policy console</span></div><span className="hidden rounded-full border border-terminal-border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[.14em] text-terminal-muted sm:inline"><span className="mr-1.5 text-decision-allow">●</span>Robinhood Chain · Testnet</span></header>
+    <section className="border-b border-terminal-border pb-7"><p className="eyebrow">Core policy engine</p><h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">Decide before value moves.</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-terminal-muted">LedgerLine determines whether a financial action is allowed based on an asset&apos;s price, lifecycle, position, and risk state.</p></section>
+    <PolicyConsole />
+    <footer className="border-t border-terminal-border py-5 text-xs text-terminal-muted">LedgerLine Core · Policy decisions are enforced by the lending adapter onchain.</footer>
+  </main>;
 }
