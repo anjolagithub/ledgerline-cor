@@ -5,7 +5,9 @@ import { localChain, robinhoodChainTestnet } from "./chains";
 // Which chain is "active" is controlled entirely by NEXT_PUBLIC_CHAIN_ID --
 // no code change needed to move from local Anvil to Robinhood Chain
 // testnet, only environment configuration (per Phase 8 sign-off).
-const activeChainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? localChain.id);
+// Falls back to the real Robinhood Chain testnet (not the local devnode)
+// so a missing env var in production doesn't silently target localhost.
+const activeChainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? robinhoodChainTestnet.id);
 
 export const config = createConfig({
   chains: [localChain, robinhoodChainTestnet],
