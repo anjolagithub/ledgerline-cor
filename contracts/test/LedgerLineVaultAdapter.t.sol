@@ -103,4 +103,28 @@ contract LedgerLineVaultAdapterTest is Test {
         vm.expectRevert();
         lendingAdapter.releaseCollateral(user, 1 * ONE);
     }
+
+
+    function test_withdrawBlockedIfWouldUnderCollateralizeDebt() public {
+        vm.prank(user);
+        lendingAdapter.borrow(100_000 * ONE); // near max capacity ($112k)
+
+        // Withdrawing most of the collateral would leave remaining
+        // capacity below the $100k debt -- must revert.
+        vm.prank(user);
+        vm.expectRevert();
+        vaultAdapter.withdraw(900 * ONE); // leaves only 100/1000 shares
+    }
+
+    function test_withdrawAllowedIfDebtStillCovered() public {
+        vm.prank(user);
+        lendingAdapter.borrow(50_000 * ONE); // well under capacity
+
+        // Withdrawing a small amount still leaves enough collateral
+        // to cover the $50k debt -- should succeed.
+        vm.prank(user);
+        vaultAdapter.withdraw(10 * ONE);
+
+        assertEq(stock.balanceOf(user), 10 * ONE);
+    }
 }

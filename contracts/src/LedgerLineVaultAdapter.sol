@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Action, Decision, PolicyResponse, Position} from "./interfaces/LedgerLineTypes.sol";
+import {Action, Decision, PolicyResponse, Position, AssetState} from "./interfaces/LedgerLineTypes.sol";
 import {ILedgerLineRegistry} from "./interfaces/ILedgerLineRegistry.sol";
 import {ILedgerLinePolicy} from "./interfaces/ILedgerLinePolicy.sol";
+import {IPositionEngine} from "./interfaces/IPositionEngine.sol";
+import {IRiskEngine} from "./interfaces/IRiskEngine.sol";
 import {LedgerLineLendingAdapter} from "./LedgerLineLendingAdapter.sol";
+import {LedgerLinePolicy} from "./LedgerLinePolicy.sol";
 
 /// @notice LedgerLine's second reference consumer -- deliberately NOT a
 /// second lending market. Proves canExecute() correctly differentiates
@@ -33,6 +36,7 @@ contract LedgerLineVaultAdapter {
     error NoPosition();
     error PolicyBlocked(bytes32 reason);
     error ExceedsPosition(uint256 requested, uint256 available);
+    error WouldUnderCollateralizeDebt(uint256 existingDebt, uint256 remainingCapacity);
 
     constructor(
         address registryAddress,
@@ -66,6 +70,28 @@ contract LedgerLineVaultAdapter {
 
         if (response.decision == Decision.BLOCK) {
             revert PolicyBlocked(response.reason);
+        }
+
+        // Policy.canExecute() deliberately does not see debt -- it
+        // lives only in LendingAdapter, per the locked Phase 4 design.
+        // This adapter is the one place that legitimately needs
+        // visibility into both position and debt, so the check
+        // happens here rather than weakening canExecute()'s
+        // debt-agnostic contract.
+        uint256 existingDebt = lendingAdapter.debt(msg.sender);
+        if (existingDebt > 0) {
+            AssetState memory asset = registry.getAssetState(assetId);
+            uint256 remainingRawBalance = position.rawBalance - amount;
+            LedgerLinePolicy concretePolicy = LedgerLinePolicy(address(policy));
+            uint256 remainingPositionValue = IPositionEngine(address(concretePolicy.positionEngine())).computePositionValue(
+                remainingRawBalance, asset.price, asset.multiplier
+            );
+            uint256 remainingCapacity = IRiskEngine(address(concretePolicy.riskEngine())).computeBorrowingCapacity(
+                remainingPositionValue, asset.collateralFactorBps, asset.riskAdjustmentBps
+            );
+            if (remainingCapacity < existingDebt) {
+                revert WouldUnderCollateralizeDebt(existingDebt, remainingCapacity);
+            }
         }
 
         lendingAdapter.releaseCollateral(msg.sender, amount);
