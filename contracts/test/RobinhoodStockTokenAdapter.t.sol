@@ -6,6 +6,7 @@ import {RobinhoodStockTokenAdapter} from "../src/RobinhoodStockTokenAdapter.sol"
 import {AssetState} from "../src/interfaces/LedgerLineTypes.sol";
 import {MockChainlinkFeed} from "./mocks/MockChainlinkFeed.sol";
 import {MockRobinhoodStockToken} from "./mocks/MockRobinhoodStockToken.sol";
+import {MockStockTokenNoPauseFlag} from "./mocks/MockStockTokenNoPauseFlag.sol";
 
 contract RobinhoodStockTokenAdapterTest is Test {
     RobinhoodStockTokenAdapter adapter;
@@ -85,5 +86,19 @@ contract RobinhoodStockTokenAdapterTest is Test {
         AssetState memory state = adapter.getAssetState(1);
         uint256 expected = uint256(rawAnswer) * (10 ** (18 - decimals));
         assertEq(state.price, expected);
+    }
+
+
+    function test_gracefullyDegradesWhenOraclePausedNotImplemented() public {
+        // Matches verified live behavior: real testnet TSLA reverts on
+        // oraclePaused() (function not implemented on that deployment).
+        // The adapter must NOT revert the whole call -- staleness check
+        // remains the guard and this should succeed normally.
+        MockStockTokenNoPauseFlag tokenWithoutPauseFlag = new MockStockTokenNoPauseFlag();
+        vm.prank(owner);
+        adapter.setStockToken(address(tokenWithoutPauseFlag));
+
+        AssetState memory state = adapter.getAssetState(1);
+        assertEq(state.price, 300 * 1e18, "should still return valid state despite missing oraclePaused()");
     }
 }
