@@ -38,7 +38,13 @@ body {
 .nav-link::after { position: absolute; right: 0; bottom: 1px; left: 0; height: 1px; background: var(--color-terminal-accent); content: ""; opacity: 0; transform: scaleX(.4); transition: opacity 180ms ease, transform 180ms ease; }
 .nav-link:hover::after { opacity: 1; transform: scaleX(1); }
 .mobile-nav-menu { display: none; position: relative; }
-.glass-menu { border: 1px solid rgba(145,165,189,.2); background: rgba(13,27,46,.42); list-style: none; }
+.glass-menu { display: grid; width: 2.25rem; height: 2.25rem; place-items: center; border: 1px solid rgba(145,165,189,.2); background: rgba(13,27,46,.42); list-style: none; cursor: pointer; transition: border-color 160ms ease, background 160ms ease; }
+.glass-menu:hover, .glass-menu:focus-visible { border-color: rgba(255,112,88,.55); background: rgba(255,112,88,.1); }
+.menu-icon { display: grid; width: 1rem; gap: 3px; }
+.menu-icon i { display: block; height: 1px; width: 100%; background: currentColor; transition: transform 160ms ease, opacity 160ms ease; }
+.mobile-nav-menu[open] .menu-icon i:nth-child(1) { transform: translateY(4px) rotate(45deg); }
+.mobile-nav-menu[open] .menu-icon i:nth-child(2) { opacity: 0; }
+.mobile-nav-menu[open] .menu-icon i:nth-child(3) { transform: translateY(-4px) rotate(-45deg); }
 .glass-menu::-webkit-details-marker { display: none; }
 .mobile-nav-panel { position: absolute; top: calc(100% + .65rem); right: 0; display: grid; min-width: 12rem; gap: 3px; border: 1px solid rgba(145,165,189,.24); border-radius: 1rem; background: linear-gradient(145deg, rgba(17,36,59,.96), rgba(7,17,31,.96)); padding: .45rem; box-shadow: 0 22px 50px rgba(0,0,0,.42), inset 0 1px 0 rgba(238,245,255,.1); backdrop-filter: blur(24px) saturate(140%); }
 .mobile-nav-panel::before { display: block; padding: .45rem .7rem .35rem; color: var(--color-terminal-accent); content: "Navigate"; font-family: var(--font-mono); font-size: .52rem; letter-spacing: .16em; text-transform: uppercase; }
