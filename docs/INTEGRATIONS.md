@@ -98,28 +98,34 @@ staleness check below remains the actual guard.
 `RobinhoodStockTokenAdapter` supports an optional Chainlink L2
 Sequencer Uptime Feed check (`_checkSequencerUp`: sequencer must
 report up, and the configured grace period since it last came up must
-have elapsed) — this exists in the code and is unconditionally called
-by `getAssetState()`.
+have elapsed), gated by a `sequencerCheckEnabled` flag that defaults
+to `false`.
 
 **No such feed currently exists for Robinhood Chain, on any network**
 (`DeployTestnetReal.s.sol`'s own comment: "No Chainlink L2 Sequencer
-Uptime Feed exists for Robinhood Chain on any network"). Both real
-deployments (`DeployTestnetReal.s.sol` and `DeployTestnetRealV2.s.sol`)
-pass `address(0)` as the sequencer feed address.
+Uptime Feed exists for Robinhood Chain on any network"). All real
+deployments pass `address(0)` as the sequencer feed address, and leave
+`sequencerCheckEnabled` at its default `false` — the owner can call
+`setSequencerCheckEnabled(true)` once a real feed exists and has been
+set via `setSequencerUptimeFeed`, but not before, since enabling it
+against `address(0)` would make every `getAssetState()` call revert.
 
-**This means `RobinhoodStockTokenAdapter.getAssetState()` currently
-reverts unconditionally if called against the real deployment** —
-calling `latestRoundData()` on the zero address fails Solidity's
-implicit contract-existence check for an external call with a return
-value. This is verified directly (not assumed): a Foundry test
-constructing the adapter with the real deployment's exact constructor
-arguments and calling `getAssetState()` reverts every time. It is
-currently inconsequential only because nothing in the live path
-actually calls this function (see below) — but it means the adapter,
-as deployed, cannot be used to read a live price today without either
-deploying a real sequencer feed or changing the code to make that
-check conditional. This is disclosed again in `docs/SECURITY.md` as a
-known limitation.
+**This was not always true.** The currently-live
+`RobinhoodStockTokenAdapter` instance
+(`0x9aE01a29Ec6774CAb63C6491F8f7D6b3866D1c2f` at V2 deploy time) had no
+such flag — `getAssetState()` called `_checkSequencerUp()`
+unconditionally, which reverted every time against the zero-address
+feed. Commit `d1a289a` added the real, working toggle (a first attempt
+had been written into a deploy script's comments but never actually
+applied to the contract — confirmed absent via `git log`), and
+`contracts/script/RedeployStockAdapter.s.sol` redeployed a fixed
+instance at `0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9`
+(`docs/DEPLOYMENTS.md`). Verified directly: constructing the adapter
+with that deployment's exact constructor arguments and calling
+`getAssetState()` now returns a valid `AssetState` instead of
+reverting. This makes the adapter *usable* for a live price read — it
+is still not wired into Registry's live decision path (see the table
+below), so nothing changes about what Registry actually returns today.
 
 ## Testnet price-feed limitation
 

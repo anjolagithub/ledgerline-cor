@@ -100,33 +100,49 @@ updated before the external `safeTransfer` call.
    `LedgerLineLendingAdapter`. Any future capacity-gated consumer of
    `Policy` that doesn't replicate this check itself would under-protect
    its own callers — Policy will not do it for them (`docs/POLICY.md`).
-3. **`RobinhoodStockTokenAdapter` is deployed with `sequencerUptimeFeed
-   = address(0)`**, because no real sequencer-uptime feed exists for
-   this chain. Its `getAssetState()` therefore reverts unconditionally
-   if ever called — verified directly against the real deployment's
-   constructor arguments. Currently inconsequential only because
-   nothing in the live path calls it (`docs/INTEGRATIONS.md`).
-4. **No live oracle.** Registry's price/lifecycle/risk parameters are
+3. **No live oracle.** Registry's price/lifecycle/risk parameters are
    entirely owner-set; a compromised or malicious owner key can set
    arbitrary values that flow straight into every policy decision.
-5. **`Registry` bounds `collateralFactorBps`/`riskAdjustmentBps` to
+4. **`Registry` bounds `collateralFactorBps`/`riskAdjustmentBps` to
    ≤ 10,000 (fixed and fuzz-tested this phase) but does not bound
    `price`** beyond the arithmetic consequence of a zero price yielding
    zero capacity — there is no sanity or deviation check on price
    updates.
-6. **The V1 `LedgerLineLendingAdapter`
+5. **The V1 `LedgerLineLendingAdapter`
    (`0x598e3884657c8eF4870381E4c1Cc4e8e2D0dbcB7`) is permanently
    abandoned** with 1 real TSLA stranded in it — it predates
    authorized-releaser support and cannot be retrofitted without a
    storage-layout change, and none of these contracts are upgradeable
-   by design (see `docs/DEPLOYMENTS.md`).
-7. **No upgradeability anywhere in the stack** (matches the project's
+   by design (see `docs/DEPLOYMENTS.md`). The same is true of the
+   pre-fix `RobinhoodStockTokenAdapter` instance
+   (`0x9aE01a29Ec6774CAb63C6491F8f7D6b3866D1c2f`, superseded below).
+6. **No upgradeability anywhere in the stack** (matches the project's
    own "avoid unnecessary upgradeability" rule) — there is no proxy
    pattern and no post-deployment swap path for any immutable contract
-   reference, which is also why point 6 has no remediation short of a
+   reference, which is also why point 5 has no remediation short of a
    full redeploy.
-8. **No professional audit has been performed on any part of this
+7. **No professional audit has been performed on any part of this
    codebase.**
+
+## Fixed since the last revision of this document
+
+`RobinhoodStockTokenAdapter.getAssetState()` previously reverted
+unconditionally on the live deployment, because it called
+`_checkSequencerUp()` unconditionally against a zero-address sequencer
+feed (no real one exists for this chain). Commit `d1a289a` made
+`sequencerCheckEnabled` an actual, working toggle (defaulting to
+`false`, gating that call) — a first attempt at this fix had been
+written into a deploy script's comments but never actually applied to
+the contract itself; `git log -- contracts/src/RobinhoodStockTokenAdapter.sol`
+confirmed no such change had ever landed before `d1a289a`. Verified
+directly: constructing the adapter with the exact constructor
+arguments from the new deployment
+(`contracts/broadcast/RedeployStockAdapter.s.sol/46630/run-latest.json`)
+and calling `getAssetState()` now returns a valid `AssetState` instead
+of reverting. The redeployed instance's address is in
+`docs/DEPLOYMENTS.md`. This does not change the fact that this
+contract still isn't wired into the live Registry-read path
+(`docs/INTEGRATIONS.md`) — it's now *usable*, not yet *used*.
 
 ## Not claimed
 

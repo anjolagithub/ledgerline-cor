@@ -17,12 +17,27 @@ Source of truth: `contracts/broadcast/DeployTestnetRealV2.s.sol/46630/run-latest
 |---|---|---|---|
 | `LedgerLineLendingAdapter` | `0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97` | 122446946 | `0x5bde0152f9602b912d62ff7261ff04959a4b73752b7fcbb8817ce1b06923a699` |
 | `LedgerLineVaultAdapter` | `0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67` | 122446953 | `0x8002297778054ce53d549e3e67c76c08efd8e2244c54717f3ea3850048a6a141` |
-| `RobinhoodStockTokenAdapter` | `0x9aE01a29Ec6774CAb63C6491F8f7D6b3866D1c2f` | 122446920 | `0xeaa7a3e13f604f7d73074f5b4c00e79a877e4c238ccfb7a20d72e42b75988aaf` |
+| `RobinhoodStockTokenAdapter` | `0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9` | 122531798 | `0xdebba93e4771b6bcaee54eb3c2c7503c77ad1e672c95c6c4212e4ef77307b49c` |
 | `MockChainlinkFeed` (reference price for the above) | `0x4548F12F03c3123983b046EAc237876E03A2D7e3` | 122446900 | `0x8eb349b06a4c191efb88bc3aea99f24e9d686c091fed61a24821ddfbbec72713` |
 
-`RobinhoodStockTokenAdapter` and `MockChainlinkFeed` are real, live
-contracts on this deployment, but are not wired into the live decision
-path — see `docs/INTEGRATIONS.md`.
+`RobinhoodStockTokenAdapter` was redeployed at the address above by
+`contracts/script/RedeployStockAdapter.s.sol` after commit `d1a289a`
+made `sequencerCheckEnabled` a real, working toggle (default `false`)
+— the original V2 instance's `getAssetState()` reverted
+unconditionally because it unconditionally called `_checkSequencerUp()`
+against a zero-address sequencer feed (no real one exists for this
+chain). Verified directly: constructing the adapter with the exact
+constructor arguments from this deployment's broadcast log and calling
+`getAssetState()` now returns a valid `AssetState` instead of
+reverting (see `docs/SECURITY.md`).
+
+| Contract | Old address | Status |
+|---|---|---|
+| `RobinhoodStockTokenAdapter` (pre-fix) | `0x9aE01a29Ec6774CAb63C6491F8f7D6b3866D1c2f` | Abandoned — `getAssetState()` reverts unconditionally on this instance; do not use |
+
+Both `RobinhoodStockTokenAdapter` instances and `MockChainlinkFeed` are
+real, live contracts, but neither is wired into the live Registry-read
+decision path — see `docs/INTEGRATIONS.md`.
 
 ## Real assets
 
