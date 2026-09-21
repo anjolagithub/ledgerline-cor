@@ -73,6 +73,15 @@ body {
 .signal-card { border: 1px solid var(--color-terminal-border); border-radius: 1rem; background: linear-gradient(135deg, rgba(17,36,59,.72), rgba(7,17,31,.32)); padding: 20px 24px; box-shadow: inset 0 1px 0 rgba(238,245,255,.05); }
 .code-card { border: 1px solid var(--color-terminal-border); border-radius: 1rem; background: linear-gradient(135deg, rgba(17,36,59,.88), rgba(7,17,31,.72)); box-shadow: inset 0 1px 0 rgba(238,245,255,.06), 0 18px 40px rgba(0,0,0,.14); }
 .decision-list { border-left: 1px solid var(--color-terminal-border); padding-left: 24px; }
+.console-shell { box-shadow: 0 24px 60px rgba(0,0,0,.16), inset 0 1px 0 rgba(238,245,255,.04); }
+.console-data-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--color-terminal-border); border-left: 1px solid var(--color-terminal-border); }
+.console-data-grid > div { display: flex; min-height: 7rem; flex-direction: column; justify-content: space-between; gap: .5rem; border-right: 1px solid var(--color-terminal-border); border-bottom: 1px solid var(--color-terminal-border); padding: 1rem; }
+.console-data-grid span, .console-data-grid small { color: var(--color-terminal-muted); font-family: var(--font-mono); font-size: .62rem; letter-spacing: .05em; text-transform: uppercase; }
+.console-data-grid strong { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 500; letter-spacing: -.03em; }
+.decision-panel { box-shadow: inset 0 1px 0 rgba(238,245,255,.05); }
+.decision-word { font-family: var(--font-mono); font-size: clamp(3.5rem, 9vw, 6rem); font-weight: 600; letter-spacing: -.08em; line-height: .9; }
+@media (max-width: 480px) { .console-data-grid { grid-template-columns: 1fr; } .console-data-grid > div { min-height: 5.5rem; } .decision-word { font-size: 4rem; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 .architecture-flow { display: grid; align-items: stretch; gap: 12px; }
 .flow-node { display: flex; min-height: 132px; flex-direction: column; justify-content: center; gap: 10px; border: 1px solid var(--color-terminal-border); padding: 22px; }
 .flow-node strong { font-size: 1.05rem; font-weight: 600; }
