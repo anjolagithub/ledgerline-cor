@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { ASSET_ID, ONE, REGISTRY, STOCK_TOKEN, formatUnits18, bpsToPercent, LIFECYCLE_LABELS } from "@/lib/contracts";
 import { ConnectButton } from "./ConnectButton";
+import { DepositForm } from "./DepositForm";
 import { BorrowForm } from "./BorrowForm";
 
 export function PolicyConsole() {
@@ -24,6 +25,7 @@ export function PolicyConsole() {
     <div className="grid gap-7 xl:grid-cols-[1.05fr_.95fr]">
       <div className="space-y-6">
         <div className="console-data-grid"><div><span>Asset</span><strong>{symbol ?? "--"}</strong><small>Robinhood Stock Token</small></div><div><span>Lifecycle</span><strong className="text-decision-allow">● {displayLifecycle}</strong><small>Oracle ● HEALTHY</small></div><div><span>Price</span><strong>${formatUnits18(state?.price)}</strong><small>Position {formatUnits18(position?.rawBalance)} {symbol ?? ""}</small></div><div><span>Position value</span><strong>${formatUnits18(positionValue)}</strong><small>Collateral factor {bpsToPercent(state?.collateralFactorBps)}</small></div></div>
+        <DepositForm />
         <div className="flex items-center justify-between border-t border-terminal-border pt-4"><button type="button" className="font-mono text-[10px] uppercase tracking-[.12em] text-terminal-muted underline-offset-4 hover:text-terminal-text hover:underline" onClick={() => setOperatorMode((value) => !value)} aria-expanded={operatorMode}>Operator mode {operatorMode ? "−" : "+"}</button>{operatorMode && <select aria-label="Change demo lifecycle" value={demoLifecycle ?? lifecycle ?? 0} onChange={(e) => setDemoLifecycle(Number(e.target.value))} className="border border-terminal-border bg-terminal-bg px-2 py-2 font-mono text-[10px] text-terminal-text"><option value="0">ACTIVE</option><option value="1">RESTRICTED</option><option value="2">CORPORATE ACTION</option><option value="3">SUSPENDED</option><option value="4">MATURING</option></select>}</div>
       </div>
       <div className="decision-panel border border-terminal-border bg-terminal-bg p-5" aria-live="polite"><div className="mb-7 flex items-center justify-between"><span className="eyebrow">Policy decision</span><span className="font-mono text-[10px] text-terminal-muted">canExecute()</span></div><BorrowForm positionValue={positionValue} collateralFactorBps={state?.collateralFactorBps} riskAdjustmentBps={state?.riskAdjustmentBps} effectiveCapacity={capacity} lifecycle={lifecycle} /></div>
