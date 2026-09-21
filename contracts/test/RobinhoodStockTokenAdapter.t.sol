@@ -40,12 +40,18 @@ contract RobinhoodStockTokenAdapterTest is Test {
     }
 
     function test_revertsWhenSequencerDown() public {
+        vm.prank(owner);
+        adapter.setSequencerCheckEnabled(true);
+
         sequencerFeed.setAnswer(1); // 1 = down
         vm.expectRevert(RobinhoodStockTokenAdapter.SequencerDown.selector);
         adapter.getAssetState(1);
     }
 
     function test_revertsDuringSequencerGracePeriod() public {
+        vm.prank(owner);
+        adapter.setSequencerCheckEnabled(true);
+
         sequencerFeed.setStartedAt(block.timestamp); // just came back up
         vm.expectRevert(RobinhoodStockTokenAdapter.GracePeriodNotOver.selector);
         adapter.getAssetState(1);

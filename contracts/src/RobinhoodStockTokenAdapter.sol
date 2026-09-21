@@ -41,6 +41,7 @@ contract RobinhoodStockTokenAdapter is IAssetStateAdapter, Ownable {
     AggregatorV3Interface public priceFeed;
     AggregatorV3Interface public sequencerUptimeFeed;
 
+    bool public sequencerCheckEnabled;
     uint256 public gracePeriodSeconds;
     uint256 public stalenessThresholdSeconds;
     uint256 public collateralFactorBps;
@@ -67,6 +68,11 @@ contract RobinhoodStockTokenAdapter is IAssetStateAdapter, Ownable {
         stockToken = IRobinhoodStockToken(stockTokenAddress);
         priceFeed = AggregatorV3Interface(priceFeedAddress);
         sequencerUptimeFeed = AggregatorV3Interface(sequencerUptimeFeedAddress);
+        // Disabled by default -- no real Sequencer Uptime Feed exists
+        // for this chain (verified against Chainlink's own supported-
+        // network list). Enabling this against address(0) would make
+        // every getAssetState() call revert unconditionally.
+        sequencerCheckEnabled = false;
         gracePeriodSeconds = gracePeriodSeconds_;
         stalenessThresholdSeconds = stalenessThresholdSeconds_;
         collateralFactorBps = initialCollateralFactorBps;
@@ -83,6 +89,12 @@ contract RobinhoodStockTokenAdapter is IAssetStateAdapter, Ownable {
 
     function setSequencerUptimeFeed(address feedAddress) external onlyOwner {
         sequencerUptimeFeed = AggregatorV3Interface(feedAddress);
+    }
+
+    /// @dev Only enable once a real Sequencer Uptime Feed address for
+    /// this chain has been set via setSequencerUptimeFeed.
+    function setSequencerCheckEnabled(bool enabled) external onlyOwner {
+        sequencerCheckEnabled = enabled;
     }
 
     function setGracePeriodSeconds(uint256 value) external onlyOwner {
@@ -107,7 +119,9 @@ contract RobinhoodStockTokenAdapter is IAssetStateAdapter, Ownable {
     /// single, specific Stock Token, matching the current single-asset
     /// scope established in Phase 3/4.
     function getAssetState(uint256 /* assetId */) external view returns (AssetState memory) {
-        _checkSequencerUp();
+        if (sequencerCheckEnabled) {
+            _checkSequencerUp();
+        }
         _checkOraclePausedAdvisory();
 
         (, int256 answer, , uint256 updatedAt,) = priceFeed.latestRoundData();
