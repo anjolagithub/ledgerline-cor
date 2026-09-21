@@ -1,6 +1,7 @@
 import registryAbi from "../abi/LedgerLineRegistry.json";
 import policyAbi from "../abi/LedgerLinePolicy.json";
 import adapterAbi from "../abi/LedgerLineLendingAdapter.json";
+import vaultAdapterAbi from "../abi/LedgerLineVaultAdapter.json";
 import stockTokenAbi from "../abi/MockStockToken.json";
 import borrowTokenAbi from "../abi/MockBorrowToken.json";
 import type { Abi, Address } from "viem";
@@ -28,6 +29,11 @@ export const POLICY = {
 export const LENDING_ADAPTER = {
   address: requireAddress(process.env.NEXT_PUBLIC_LENDING_ADAPTER_ADDRESS, "LENDING_ADAPTER"),
   abi: adapterAbi as Abi,
+};
+
+export const VAULT_ADAPTER = {
+  address: requireAddress(process.env.NEXT_PUBLIC_VAULT_ADAPTER_ADDRESS, "VAULT_ADAPTER"),
+  abi: vaultAdapterAbi as Abi,
 };
 
 export const STOCK_TOKEN = {
@@ -69,6 +75,7 @@ const KNOWN_ERRORS: Record<string, string> = {
   AssetNotInitialized: "Asset not initialized",
   NoPosition: "No position -- deposit first",
   InvalidBps: "Invalid parameter value",
+  ExceedsPosition: "Exceeds available position",
 };
 
 export function decodeRevertReason(error: unknown): string {
