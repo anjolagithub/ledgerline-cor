@@ -16,9 +16,27 @@ Source of truth: `contracts/broadcast/DeployTestnetRealV2.s.sol/46630/run-latest
 | Contract | Address | Deploy block | Deploy tx |
 |---|---|---|---|
 | `LedgerLineLendingAdapter` | `0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97` | 122446946 | `0x5bde0152f9602b912d62ff7261ff04959a4b73752b7fcbb8817ce1b06923a699` |
-| `LedgerLineVaultAdapter` | `0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67` | 122446953 | `0x8002297778054ce53d549e3e67c76c08efd8e2244c54717f3ea3850048a6a141` |
+| `LedgerLineVaultAdapter` | `0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac` | not recorded in this repo | not recorded in this repo |
 | `RobinhoodStockTokenAdapter` | `0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9` | 122531798 | `0xdebba93e4771b6bcaee54eb3c2c7503c77ad1e672c95c6c4212e4ef77307b49c` |
 | `MockChainlinkFeed` (reference price for the above) | `0x4548F12F03c3123983b046EAc237876E03A2D7e3` | 122446900 | `0x8eb349b06a4c191efb88bc3aea99f24e9d686c091fed61a24821ddfbbec72713` |
+
+`LedgerLineVaultAdapter` was redeployed at the address above by
+`contracts/script/RedeployVaultAdapter.s.sol` after commit `9fa2c38`
+added a debt-safety check to `withdraw()` (it now blocks withdrawals
+that would leave outstanding `LendingAdapter` debt uncollateralized).
+The new instance was re-authorized as a releaser on `LendingAdapter`
+by the same deploy script. **Unlike the other entries in this table,
+this redeploy's broadcast receipt was not run against this repo's
+Foundry project** (`contracts/broadcast/RedeployVaultAdapter.s.sol/`
+does not exist here), so its deploy block and tx hash are not
+recorded — the address above is taken from the deploy script's own
+console output, not re-derived from a broadcast file the way every
+other address in this document is. Re-derive and fill in the block/tx
+columns above from the actual broadcast log if it becomes available.
+
+| Contract | Old address | Status |
+|---|---|---|
+| `LedgerLineVaultAdapter` (pre-fix) | `0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67` | Abandoned — `withdraw()` does not check outstanding debt on this instance; do not use |
 
 `RobinhoodStockTokenAdapter` was redeployed at the address above by
 `contracts/script/RedeployStockAdapter.s.sol` after commit `d1a289a`

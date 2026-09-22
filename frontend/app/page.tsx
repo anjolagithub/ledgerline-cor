@@ -5,6 +5,13 @@ import { DisabledGitHubLink } from "@/components/DisabledGitHubLink";
 const code = `(Decision decision, uint256 permittedAmount, bytes32 reason) =
     ledgerLine.canExecute(assetId, positionId, Action.BORROW, amount);`;
 
+const sdkCode = `import { LedgerLineClient, Action } from "@ledgerline/core";
+
+const client = new LedgerLineClient(); // defaults to live testnet deployment
+const positionId = LedgerLineClient.positionIdFromAddress(address);
+const borrowCheck = await client.canExecute(positionId, Action.BORROW, amount);
+const withdrawCheck = await client.canExecute(positionId, Action.WITHDRAW, amount);`;
+
 const decisions = [
   ["ALLOW", "The action can execute.", "text-decision-allow"],
   ["LIMIT", "The amount must be adjusted and resubmitted.", "text-decision-limit"],
@@ -33,7 +40,7 @@ export default function Landing() {
 
       <section className="feature-section grid gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">State matters</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">When the asset changes, the policy changes with it.</h2></div><div className="state-story"><div><span className="eyebrow">Lifecycle</span><div className="mt-4 font-mono text-2xl">ACTIVE <span className="text-terminal-accent">→</span> RESTRICTED</div></div><div className="state-result"><span className="font-mono text-xs text-terminal-muted">BORROW REQUEST · $100,000</span><strong className="text-decision-block">BLOCK</strong><p>Asset state does not permit this action.</p></div></div></section>
 
-      <section id="developer" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">For developers</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">A decision protocol, not another dashboard.</h2></div><div className="grid gap-6 md:grid-cols-[1.2fr_.8fr]"><pre className="code-card overflow-x-auto p-6 text-xs leading-7 text-terminal-muted"><code>{code}</code></pre><div className="decision-list grid gap-4 text-sm leading-6 text-terminal-muted">{decisions.map(([name, description, color]) => <p key={name}><span className={`font-mono ${color}`}>{name}</span><br />{description}</p>)}</div></div></section>
+      <section id="developer" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">For developers</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">A decision protocol, not another dashboard.</h2></div><div className="grid gap-6 md:grid-cols-[1.2fr_.8fr]"><pre className="code-card overflow-x-auto p-6 text-xs leading-7 text-terminal-muted"><code>{code}</code></pre><div className="decision-list grid gap-4 text-sm leading-6 text-terminal-muted">{decisions.map(([name, description, color]) => <p key={name}><span className={`font-mono ${color}`}>{name}</span><br />{description}</p>)}</div></div><div className="grid gap-4"><p className="eyebrow">TypeScript SDK</p><pre className="code-card overflow-x-auto p-6 text-xs leading-7 text-terminal-muted"><code>{sdkCode}</code></pre><p className="text-sm leading-6 text-terminal-muted"><code className="font-mono text-terminal-text">@ledgerline/core</code> is available in this repo&apos;s <code className="font-mono text-terminal-text">sdk/</code> directory -- a typed viem client over the live Registry/Policy/LendingAdapter/VaultAdapter deployment.</p></div></section>
 
       <section className="flex flex-col gap-7 py-20 md:flex-row md:items-end md:justify-between md:py-24"><div><p className="eyebrow">Build with conviction</p><h2 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">Make every financial action explainable.</h2></div><div className="flex gap-3"><Link href="/app" className="primary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em]">Explore Core →</Link><DisabledGitHubLink /></div></section>
 

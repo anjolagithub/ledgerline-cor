@@ -85,46 +85,59 @@ updated before the external `safeTransfer` call.
 
 ## Known limitations (Phase 10, disclosed)
 
-1. **`VaultAdapter.withdraw()` does not check outstanding debt at
-   all.** A user who has borrowed against their position can withdraw
-   the underlying collateral out from under that debt, because neither
-   `Policy` nor `VaultAdapter` ever reads `LendingAdapter.debt`. This
-   is by design (`docs/POLICY.md` explains why WITHDRAW is a pure
-   lifecycle question in this codebase) and is directly tested
-   (`test_withdrawIgnoresCapacityEntirely`), but it means the two
-   consumers do not compose into a solvency-safe system together — that
-   was never the two-consumer proof's goal, and isn't claimed here.
-2. **`Policy.canExecute` for BORROW only sees the newly-requested
+1. **`Policy.canExecute` for BORROW only sees the newly-requested
    amount, not cumulative debt.** The debt-aware check
    (`debt[msg.sender] + amount > permittedAmount`) lives only inside
    `LedgerLineLendingAdapter`. Any future capacity-gated consumer of
    `Policy` that doesn't replicate this check itself would under-protect
    its own callers — Policy will not do it for them (`docs/POLICY.md`).
-3. **No live oracle.** Registry's price/lifecycle/risk parameters are
+2. **No live oracle.** Registry's price/lifecycle/risk parameters are
    entirely owner-set; a compromised or malicious owner key can set
    arbitrary values that flow straight into every policy decision.
-4. **`Registry` bounds `collateralFactorBps`/`riskAdjustmentBps` to
+3. **`Registry` bounds `collateralFactorBps`/`riskAdjustmentBps` to
    ≤ 10,000 (fixed and fuzz-tested this phase) but does not bound
    `price`** beyond the arithmetic consequence of a zero price yielding
    zero capacity — there is no sanity or deviation check on price
    updates.
-5. **The V1 `LedgerLineLendingAdapter`
+4. **The V1 `LedgerLineLendingAdapter`
    (`0x598e3884657c8eF4870381E4c1Cc4e8e2D0dbcB7`) is permanently
    abandoned** with 1 real TSLA stranded in it — it predates
    authorized-releaser support and cannot be retrofitted without a
    storage-layout change, and none of these contracts are upgradeable
    by design (see `docs/DEPLOYMENTS.md`). The same is true of the
    pre-fix `RobinhoodStockTokenAdapter` instance
-   (`0x9aE01a29Ec6774CAb63C6491F8f7D6b3866D1c2f`, superseded below).
-6. **No upgradeability anywhere in the stack** (matches the project's
+   (`0x9aE01a29Ec6774CAb63C6491F8f7D6b3866D1c2f`, superseded below), and
+   of the pre-fix `LedgerLineVaultAdapter` instance
+   (`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`, superseded below).
+5. **No upgradeability anywhere in the stack** (matches the project's
    own "avoid unnecessary upgradeability" rule) — there is no proxy
    pattern and no post-deployment swap path for any immutable contract
-   reference, which is also why point 5 has no remediation short of a
+   reference, which is also why point 4 has no remediation short of a
    full redeploy.
-7. **No professional audit has been performed on any part of this
+6. **No professional audit has been performed on any part of this
    codebase.**
 
 ## Fixed since the last revision of this document
+
+`VaultAdapter.withdraw()` previously did not check outstanding debt at
+all — a user who had borrowed against their position could withdraw
+the underlying collateral out from under that debt, because neither
+`Policy` nor `VaultAdapter` ever read `LendingAdapter.debt`.
+`Policy.canExecute()` deliberately stays debt-agnostic (`docs/POLICY.md`
+explains why WITHDRAW is a pure lifecycle question in this codebase;
+its own tests are unchanged). Commit `9fa2c38` closes the gap with a
+separate check inside `VaultAdapter.withdraw()` itself — the one place
+with legitimate visibility into both position and cross-contract
+debt — which now reverts if a withdrawal would leave outstanding
+`LendingAdapter` debt uncollateralized
+(`test_withdrawBlockedIfWouldUnderCollateralizeDebt`,
+`test_withdrawAllowedIfDebtStillCovered`). Because this changes
+`VaultAdapter`'s bytecode, the live instance was redeployed by
+`contracts/script/RedeployVaultAdapter.s.sol` and re-authorized as a
+releaser on `LendingAdapter`; the pre-fix instance is abandoned (see
+`docs/DEPLOYMENTS.md`). This does not change limitation 1 above
+(`Policy.canExecute` for BORROW only sees the newly-requested amount) —
+that remains a separate, unfixed gap.
 
 `RobinhoodStockTokenAdapter.getAssetState()` previously reverted
 unconditionally on the live deployment, because it called
@@ -148,7 +161,8 @@ contract still isn't wired into the live Registry-read path
 
 This document does not constitute a professional audit. No
 performance or gas benchmarks are claimed anywhere in this codebase.
-No claim is made that the two reference consumers, together, form a
-solvency-safe combined system (see limitation 1) — each is
-independently correct against its own documented policy, which is the
-narrower claim this project actually makes and tests for.
+No broader claim is made that the two reference consumers, together,
+form an exhaustively solvency-safe combined system beyond the specific
+withdraw-side gap closed in "Fixed since the last revision" above —
+each is independently correct against its own documented policy, which
+is the narrower claim this project actually makes and tests for.
