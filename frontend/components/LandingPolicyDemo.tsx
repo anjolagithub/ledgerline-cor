@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 const STATES = {
-  ACTIVE: { label: "AAPL Stock Token", risk: 80, state: "ACTIVE" },
+  ACTIVE: { label: "TSLA Stock Token", risk: 80, state: "ACTIVE" },
   RESTRICTED: { label: "TSLA Split", risk: 0, state: "RESTRICTED" },
   RISK_DELTA: { label: "Volatility Spike", risk: 50, state: "RISK_DELTA" },
 } as const;
@@ -30,7 +30,7 @@ export function LandingPolicyDemo() {
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_1.05fr]">
         <section className="flex flex-col gap-5" aria-label="Policy evaluation configuration">
-          <div><label htmlFor="asset-state" className="eyebrow">Asset state</label><select id="asset-state" value={assetState} onChange={(event) => setAssetState(event.target.value as AssetState)} className="mt-2 w-full border border-terminal-border bg-terminal-bg px-3 py-3 font-mono text-xs text-terminal-text focus:outline-none"><option value="ACTIVE">AAPL Stock Token (ACTIVE)</option><option value="RESTRICTED">TSLA Split (RESTRICTED)</option><option value="RISK_DELTA">Volatility Spike (RISK_DELTA)</option></select></div>
+          <div><label htmlFor="asset-state" className="eyebrow">Asset state</label><select id="asset-state" value={assetState} onChange={(event) => setAssetState(event.target.value as AssetState)} className="mt-2 w-full border border-terminal-border bg-terminal-bg px-3 py-3 font-mono text-xs text-terminal-text focus:outline-none"><option value="ACTIVE">TSLA Stock Token (ACTIVE)</option><option value="RESTRICTED">TSLA Split (RESTRICTED)</option><option value="RISK_DELTA">Volatility Spike (RISK_DELTA)</option></select></div>
           <div className="border border-terminal-border bg-terminal-bg p-4"><div className="mb-4 flex items-center justify-between"><span className="eyebrow">Capacity model</span><span className="font-mono text-[10px] text-terminal-muted">USDG</span></div><div className="grid gap-3 font-mono text-xs"><div className="flex justify-between"><span className="text-terminal-muted">Position value</span><span>$200,000</span></div><div className="flex justify-between"><span className="text-terminal-muted">Collateral factor</span><span>70%</span></div><div className="flex justify-between"><span className="text-terminal-muted">Risk adjustment</span><span>{config.risk}%</span></div><div className="mt-2 flex justify-between border-t border-terminal-border pt-3"><span className="text-terminal-muted">Effective capacity</span><strong className={assetState === "RESTRICTED" ? "text-terminal-muted" : "text-terminal-accent"}>{assetState === "RESTRICTED" ? "—" : `$${capacity.toLocaleString()}`}</strong></div></div></div>
           <div><label htmlFor="landing-demo-amount" className="eyebrow">Requested borrow amount</label><div className="mt-2 flex items-center border border-terminal-border bg-terminal-bg"><span className="pl-3 text-terminal-muted">$</span><input id="landing-demo-amount" type="number" min="0" value={amount} onChange={(event) => setAmount(event.target.value)} className="w-full bg-transparent px-2 py-3 font-mono text-sm focus:outline-none" /></div></div>
         </section>
