@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAccount, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { CHAIN_ID } from "./wagmi";
 import { decodeRevertReason } from "./contracts";
@@ -26,6 +28,7 @@ function isUserRejection(error: unknown): boolean {
 }
 
 export function useTransactionFlow() {
+  const queryClient = useQueryClient();
   const { chainId } = useAccount();
   const { switchChain } = useSwitchChain();
   const { writeContract, data: hash, isPending, error: writeError, reset } = useWriteContract();
@@ -35,6 +38,21 @@ export function useTransactionFlow() {
     isError: isFailed,
     error: receiptError,
   } = useWaitForTransactionReceipt({ hash });
+
+  // Every write this app makes (deposit/borrow/withdraw/transfer) changes
+  // Registry position/asset state that OTHER components read via
+  // useReadContract (PolicyConsole's position/state, DepositForm's
+  // balance, TransferForm's debt check, etc.) -- none of those reads
+  // are watching this specific hash, so without this they'd stay stale
+  // until a manual reload. wagmi/tanstack-query key every contract read
+  // as ["readContract", ...], so invalidating that prefix once per
+  // confirmed hash refetches all of them app-wide, at this single
+  // shared call site rather than in each of the four forms.
+  useEffect(() => {
+    if (hash && isConfirmed) {
+      queryClient.invalidateQueries({ queryKey: ["readContract"] });
+    }
+  }, [hash, isConfirmed, queryClient]);
 
   const wrongNetwork = chainId !== undefined && chainId !== CHAIN_ID;
 
