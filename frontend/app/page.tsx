@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LandingPolicyDemo } from "@/components/LandingPolicyDemo";
+import { DisabledGitHubLink } from "@/components/DisabledGitHubLink";
 const EXPLORER_URL = "https://explorer.testnet.chain.robinhood.com";
 const GITHUB_URL = "https://github.com/anjolagithub/ledgerline-cor";
 
