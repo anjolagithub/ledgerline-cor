@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAccount, useReadContract } from "wagmi";
 import { ASSET_ID, ONE, REGISTRY, STOCK_TOKEN, formatUnits18, bpsToPercent, LIFECYCLE_LABELS } from "@/lib/contracts";
+import { EXPLORER_TX_BASE_URL, describeRow, formatRelativeTime } from "@/lib/activity";
+import { useActivityRows } from "@/lib/useActivityRows";
 import { ConnectButton } from "./ConnectButton";
 import { DepositForm } from "./DepositForm";
 import { BorrowForm } from "./BorrowForm";
@@ -17,6 +20,8 @@ export function PolicyConsole() {
   const { data: state } = useReadContract({ address: REGISTRY.address, abi: REGISTRY.abi, functionName: "getAssetState", args: [ASSET_ID] }) as { data: { price: bigint; lifecycle: number; collateralFactorBps: bigint; riskAdjustmentBps: bigint } | undefined };
   const { data: position } = useReadContract({ address: REGISTRY.address, abi: REGISTRY.abi, functionName: "getPosition", args: [ASSET_ID, positionId], query: { enabled: !!address } }) as { data: { rawBalance: bigint } | undefined };
   const { data: symbol } = useReadContract({ address: STOCK_TOKEN.address, abi: STOCK_TOKEN.abi, functionName: "symbol" }) as { data: string | undefined };
+  const { rows: activityRows, loading: activityLoading, error: activityError } = useActivityRows();
+  const recentActivity = activityRows.slice(0, 5);
   const lifecycle = demoLifecycle ?? state?.lifecycle;
   const positionValue = position && state ? (position.rawBalance * state.price) / ONE : undefined;
   const capacity = state && positionValue !== undefined ? (positionValue * state.collateralFactorBps * state.riskAdjustmentBps) / 100000000n : undefined;
@@ -34,6 +39,41 @@ export function PolicyConsole() {
         <div className="decision-panel border border-terminal-border bg-terminal-bg p-5" aria-live="polite"><div className="mb-7 flex items-center justify-between"><span className="eyebrow">Policy decision · Transfer</span><span className="font-mono text-[10px] text-terminal-muted">transfer()</span></div><TransferForm positionRawBalance={position?.rawBalance} symbol={symbol} lifecycle={lifecycle} /></div>
       </div>
     </div>
-    <div className="mt-7 border-t border-terminal-border pt-5"><div className="flex items-center justify-between"><h3 className="eyebrow">Recent activity</h3><span className="font-mono text-[10px] text-terminal-muted">ONCHAIN EVENTS</span></div><p className="mt-3 text-sm text-terminal-muted">No activity recorded yet. Policy evaluations and confirmed transactions will appear here.</p></div>
+    <div className="mt-7 border-t border-terminal-border pt-5">
+      <div className="flex items-center justify-between">
+        <h3 className="eyebrow">Recent activity</h3>
+        <span className="font-mono text-[10px] text-terminal-muted">ONCHAIN EVENTS</span>
+      </div>
+      {activityLoading && <p className="mt-3 text-sm text-terminal-muted">Loading activity…</p>}
+      {activityError && <p className="mt-3 text-sm text-decision-block">{activityError}</p>}
+      {!activityLoading && !activityError && recentActivity.length === 0 && (
+        <p className="mt-3 text-sm text-terminal-muted">No activity recorded yet. Policy evaluations and confirmed transactions will appear here.</p>
+      )}
+      {!activityLoading && !activityError && recentActivity.length > 0 && (
+        <ul className="mt-3 divide-y divide-terminal-border">
+          {recentActivity.map((row) => {
+            const { label, amountText, detailText } = describeRow(row, symbol ?? "TSLA");
+            return (
+              <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                <div className="flex items-center gap-2 font-mono">
+                  <span className="text-terminal-text">{label}</span>
+                  {amountText && <span className="text-terminal-muted">{amountText}</span>}
+                  {detailText && <span className="text-xs text-terminal-muted">{detailText}</span>}
+                </div>
+                <div className="flex items-center gap-3 font-mono text-[10px] text-terminal-muted">
+                  <span>{formatRelativeTime(row.timestamp)}</span>
+                  <a href={`${EXPLORER_TX_BASE_URL}/${row.txHash}`} target="_blank" rel="noreferrer" className="text-terminal-accent hover:underline">
+                    Explorer
+                  </a>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <Link href="/app/activity" className="mt-3 inline-block font-mono text-[10px] uppercase tracking-[.12em] text-terminal-accent hover:underline">
+        View all activity →
+      </Link>
+    </div>
   </section>;
 }

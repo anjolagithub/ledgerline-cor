@@ -1,22 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePublicClient, useReadContract, useWatchContractEvent } from "wagmi";
-import { REGISTRY, LENDING_ADAPTER, VAULT_ADAPTER, TRANSFER_ADAPTER, STOCK_TOKEN } from "@/lib/contracts";
-import {
-  type ActivityKind,
-  type ActivityRow,
-  EXPLORER_TX_BASE_URL,
-  LENDING_ADAPTER_DEPLOY_BLOCK,
-  REGISTRY_DEPLOY_BLOCK,
-  VAULT_ADAPTER_DEPLOY_BLOCK,
-  TRANSFER_ADAPTER_DEPLOY_BLOCK,
-  describeRow,
-  formatRelativeTime,
-  pickEvents,
-  sortRowsDesc,
-  toActivityRow,
-} from "@/lib/activity";
+import { useState } from "react";
+import { useReadContract } from "wagmi";
+import { STOCK_TOKEN } from "@/lib/contracts";
+import { type ActivityKind, type ActivityRow, EXPLORER_TX_BASE_URL, describeRow, formatRelativeTime } from "@/lib/activity";
+import { useActivityRows } from "@/lib/useActivityRows";
 
 type FilterId = "all" | "deposit" | "borrow" | "withdraw" | "transfer" | "lifecycle";
 
@@ -37,14 +25,7 @@ function matchesFilter(row: ActivityRow, filter: FilterId): boolean {
   return row.kind === filter;
 }
 
-function mergeRows(existing: ActivityRow[], incoming: ActivityRow[]): ActivityRow[] {
-  const byId = new Map(existing.map((row) => [row.id, row]));
-  for (const row of incoming) byId.set(row.id, row);
-  return sortRowsDesc(Array.from(byId.values()));
-}
-
 export function ActivityLog() {
-  const publicClient = usePublicClient();
   const { data: symbol } = useReadContract({
     address: STOCK_TOKEN.address,
     abi: STOCK_TOKEN.abi,
@@ -52,142 +33,8 @@ export function ActivityLog() {
   }) as { data: string | undefined };
   const stockSymbol = symbol ?? "TSLA";
 
-  const [rows, setRows] = useState<ActivityRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | undefined>();
+  const { rows, loading, error: loadError } = useActivityRows();
   const [filter, setFilter] = useState<FilterId>("all");
-
-  useEffect(() => {
-    if (!publicClient) return;
-    let cancelled = false;
-
-    (async () => {
-      setLoading(true);
-      setLoadError(undefined);
-      try {
-        const [lendingLogs, vaultLogs, transferLogs, registryLogs] = await Promise.all([
-          publicClient.getLogs({
-            address: LENDING_ADAPTER.address,
-            events: pickEvents(LENDING_ADAPTER.abi, ["Deposited", "Borrowed"]),
-            fromBlock: LENDING_ADAPTER_DEPLOY_BLOCK,
-            toBlock: "latest",
-          }),
-          publicClient.getLogs({
-            address: VAULT_ADAPTER.address,
-            events: pickEvents(VAULT_ADAPTER.abi, ["Withdrawn"]),
-            fromBlock: VAULT_ADAPTER_DEPLOY_BLOCK,
-            toBlock: "latest",
-          }),
-          publicClient.getLogs({
-            address: TRANSFER_ADAPTER.address,
-            events: pickEvents(TRANSFER_ADAPTER.abi, ["Transferred"]),
-            fromBlock: TRANSFER_ADAPTER_DEPLOY_BLOCK,
-            toBlock: "latest",
-          }),
-          publicClient.getLogs({
-            address: REGISTRY.address,
-            events: pickEvents(REGISTRY.abi, ["LifecycleTransitioned", "AssetParametersUpdated"]),
-            fromBlock: REGISTRY_DEPLOY_BLOCK,
-            toBlock: "latest",
-          }),
-        ]);
-
-        const allLogs = [...lendingLogs, ...vaultLogs, ...transferLogs, ...registryLogs];
-        const uniqueBlockNumbers = Array.from(new Set(allLogs.map((log) => log.blockNumber))).filter(
-          (blockNumber): blockNumber is bigint => blockNumber !== null
-        );
-        const blocks = await Promise.all(
-          uniqueBlockNumbers.map((blockNumber) => publicClient.getBlock({ blockNumber }))
-        );
-        const timestampByBlock = new Map(blocks.map((block) => [block.number, block.timestamp]));
-
-        // biome-ignore lint: getLogs' return type for a multi-event `events` array
-        // doesn't narrow eventName/args per-entry; decoding is driven by the
-        // real ABI values passed in, so this is safe at runtime.
-        const nextRows = allLogs
-          .map((log) =>
-            toActivityRow(log as never, log.blockNumber ? timestampByBlock.get(log.blockNumber) : undefined)
-          )
-          .filter((row): row is ActivityRow => row !== undefined);
-
-        if (!cancelled) {
-          setRows(sortRowsDesc(nextRows));
-          setLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : "Failed to load activity");
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [publicClient]);
-
-  async function appendLiveLogs(logs: unknown[]) {
-    if (!publicClient) return;
-    const decoded = logs as {
-      eventName?: string;
-      args?: Record<string, unknown>;
-      transactionHash?: `0x${string}` | null;
-      blockNumber?: bigint | null;
-      logIndex?: number | null;
-    }[];
-
-    const blockNumbers = Array.from(new Set(decoded.map((log) => log.blockNumber))).filter(
-      (blockNumber): blockNumber is bigint => !!blockNumber
-    );
-    const blocks = await Promise.all(
-      blockNumbers.map((blockNumber) => publicClient.getBlock({ blockNumber }))
-    );
-    const timestampByBlock = new Map(blocks.map((block) => [block.number, block.timestamp]));
-
-    const newRows = decoded
-      .map((log) => toActivityRow(log, log.blockNumber ? timestampByBlock.get(log.blockNumber) : undefined))
-      .filter((row): row is ActivityRow => row !== undefined);
-
-    if (newRows.length > 0) setRows((prev) => mergeRows(prev, newRows));
-  }
-
-  useWatchContractEvent({
-    address: LENDING_ADAPTER.address,
-    abi: LENDING_ADAPTER.abi,
-    eventName: "Deposited",
-    onLogs: appendLiveLogs,
-  });
-  useWatchContractEvent({
-    address: LENDING_ADAPTER.address,
-    abi: LENDING_ADAPTER.abi,
-    eventName: "Borrowed",
-    onLogs: appendLiveLogs,
-  });
-  useWatchContractEvent({
-    address: VAULT_ADAPTER.address,
-    abi: VAULT_ADAPTER.abi,
-    eventName: "Withdrawn",
-    onLogs: appendLiveLogs,
-  });
-  useWatchContractEvent({
-    address: TRANSFER_ADAPTER.address,
-    abi: TRANSFER_ADAPTER.abi,
-    eventName: "Transferred",
-    onLogs: appendLiveLogs,
-  });
-  useWatchContractEvent({
-    address: REGISTRY.address,
-    abi: REGISTRY.abi,
-    eventName: "LifecycleTransitioned",
-    onLogs: appendLiveLogs,
-  });
-  useWatchContractEvent({
-    address: REGISTRY.address,
-    abi: REGISTRY.abi,
-    eventName: "AssetParametersUpdated",
-    onLogs: appendLiveLogs,
-  });
 
   const visibleRows = rows.filter((row) => matchesFilter(row, filter));
 
