@@ -21,6 +21,12 @@ export const LENDING_ADAPTER_DEPLOY_BLOCK = 122446946n;
 // value if RedeployVaultAdapter.s.sol's broadcast log ever becomes available.
 export const VAULT_ADAPTER_DEPLOY_BLOCK = 122446953n;
 
+// Unlike VAULT_ADAPTER_DEPLOY_BLOCK above, this one is genuinely correct:
+// read directly from
+// contracts/broadcast/DeployTransferAdapter.s.sol/46630/run-latest.json,
+// the actual deploy block of the current, only-ever TRANSFER_ADAPTER.address.
+export const TRANSFER_ADAPTER_DEPLOY_BLOCK = 123081162n;
+
 export const EXPLORER_TX_BASE_URL = "https://explorer.testnet.chain.robinhood.com/tx";
 
 /// Extracts just the named event ABI items from a contract's full ABI,
@@ -32,7 +38,7 @@ export function pickEvents(abi: Abi, names: string[]): AbiEvent[] {
   );
 }
 
-export type ActivityKind = "deposit" | "borrow" | "withdraw" | "lifecycle" | "parameters";
+export type ActivityKind = "deposit" | "borrow" | "withdraw" | "transfer" | "lifecycle" | "parameters";
 
 // Raw decoded fields only -- no display strings are baked in here, so
 // formatting (which depends on the live-read stock symbol) always
@@ -45,6 +51,7 @@ export type ActivityRow = {
   logIndex: number;
   timestamp: bigint | undefined;
   user?: Address;
+  to?: Address;
   amount?: bigint;
   lifecycleFrom?: number;
   lifecycleTo?: number;
@@ -62,7 +69,7 @@ type DecodedLog = {
 };
 
 /// Converts one decoded event log into a row of raw fields. Returns
-/// undefined for anything that isn't one of the five known events --
+/// undefined for anything that isn't one of the six known events --
 /// nothing here is invented, only what the contracts actually emit.
 export function toActivityRow(log: DecodedLog, timestamp: bigint | undefined): ActivityRow | undefined {
   const txHash = log.transactionHash;
@@ -83,6 +90,14 @@ export function toActivityRow(log: DecodedLog, timestamp: bigint | undefined): A
       return { ...base, kind: "borrow", user: args.user as Address, amount: args.amount as bigint };
     case "Withdrawn":
       return { ...base, kind: "withdraw", user: args.user as Address, amount: args.amount as bigint };
+    case "Transferred":
+      return {
+        ...base,
+        kind: "transfer",
+        user: args.from as Address,
+        to: args.to as Address,
+        amount: args.amount as bigint,
+      };
     case "LifecycleTransitioned":
       return { ...base, kind: "lifecycle", lifecycleFrom: Number(args.from), lifecycleTo: Number(args.to) };
     case "AssetParametersUpdated":
@@ -109,6 +124,7 @@ const KIND_LABELS: Record<ActivityKind, string> = {
   deposit: "Deposit",
   borrow: "Borrow",
   withdraw: "Withdraw",
+  transfer: "Transfer",
   lifecycle: "Lifecycle Change",
   parameters: "Parameters Updated",
 };
@@ -122,6 +138,15 @@ export function describeRow(row: ActivityRow, stockSymbol: string): { label: str
     case "deposit":
     case "withdraw":
       return { label, amountText: `${formatUnits18(row.amount)} ${stockSymbol}` };
+    case "transfer":
+      // No tokens move for a transfer -- amount is still denominated in
+      // the collateral token's shares (rawBalance reassigned between
+      // positionIds), same unit as deposit/withdraw's amountText above.
+      return {
+        label,
+        amountText: `${formatUnits18(row.amount)} ${stockSymbol}`,
+        detailText: row.to ? `To ${row.to.slice(0, 6)}...${row.to.slice(-4)}` : undefined,
+      };
     case "borrow":
       // NOTE: the contract's emitted `amount` is the 18-decimal internal
       // accounting value (dollar-notional), NOT the real 6-decimal USDG

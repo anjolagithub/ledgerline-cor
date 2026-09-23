@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePublicClient, useReadContract, useWatchContractEvent } from "wagmi";
-import { REGISTRY, LENDING_ADAPTER, VAULT_ADAPTER, STOCK_TOKEN } from "@/lib/contracts";
+import { REGISTRY, LENDING_ADAPTER, VAULT_ADAPTER, TRANSFER_ADAPTER, STOCK_TOKEN } from "@/lib/contracts";
 import {
   type ActivityKind,
   type ActivityRow,
@@ -10,6 +10,7 @@ import {
   LENDING_ADAPTER_DEPLOY_BLOCK,
   REGISTRY_DEPLOY_BLOCK,
   VAULT_ADAPTER_DEPLOY_BLOCK,
+  TRANSFER_ADAPTER_DEPLOY_BLOCK,
   describeRow,
   formatRelativeTime,
   pickEvents,
@@ -17,17 +18,18 @@ import {
   toActivityRow,
 } from "@/lib/activity";
 
-type FilterId = "all" | "deposit" | "borrow" | "withdraw" | "lifecycle";
+type FilterId = "all" | "deposit" | "borrow" | "withdraw" | "transfer" | "lifecycle";
 
 const TABS: { id: FilterId; label: string }[] = [
   { id: "all", label: "All" },
   { id: "deposit", label: "Deposits" },
   { id: "borrow", label: "Borrows" },
   { id: "withdraw", label: "Withdrawals" },
+  { id: "transfer", label: "Transfers" },
   { id: "lifecycle", label: "Lifecycle" },
 ];
 
-const ACTION_KINDS: ActivityKind[] = ["deposit", "borrow", "withdraw"];
+const ACTION_KINDS: ActivityKind[] = ["deposit", "borrow", "withdraw", "transfer"];
 
 function matchesFilter(row: ActivityRow, filter: FilterId): boolean {
   if (filter === "all") return true;
@@ -63,7 +65,7 @@ export function ActivityLog() {
       setLoading(true);
       setLoadError(undefined);
       try {
-        const [lendingLogs, vaultLogs, registryLogs] = await Promise.all([
+        const [lendingLogs, vaultLogs, transferLogs, registryLogs] = await Promise.all([
           publicClient.getLogs({
             address: LENDING_ADAPTER.address,
             events: pickEvents(LENDING_ADAPTER.abi, ["Deposited", "Borrowed"]),
@@ -77,6 +79,12 @@ export function ActivityLog() {
             toBlock: "latest",
           }),
           publicClient.getLogs({
+            address: TRANSFER_ADAPTER.address,
+            events: pickEvents(TRANSFER_ADAPTER.abi, ["Transferred"]),
+            fromBlock: TRANSFER_ADAPTER_DEPLOY_BLOCK,
+            toBlock: "latest",
+          }),
+          publicClient.getLogs({
             address: REGISTRY.address,
             events: pickEvents(REGISTRY.abi, ["LifecycleTransitioned", "AssetParametersUpdated"]),
             fromBlock: REGISTRY_DEPLOY_BLOCK,
@@ -84,7 +92,7 @@ export function ActivityLog() {
           }),
         ]);
 
-        const allLogs = [...lendingLogs, ...vaultLogs, ...registryLogs];
+        const allLogs = [...lendingLogs, ...vaultLogs, ...transferLogs, ...registryLogs];
         const uniqueBlockNumbers = Array.from(new Set(allLogs.map((log) => log.blockNumber))).filter(
           (blockNumber): blockNumber is bigint => blockNumber !== null
         );
@@ -163,6 +171,12 @@ export function ActivityLog() {
     onLogs: appendLiveLogs,
   });
   useWatchContractEvent({
+    address: TRANSFER_ADAPTER.address,
+    abi: TRANSFER_ADAPTER.abi,
+    eventName: "Transferred",
+    onLogs: appendLiveLogs,
+  });
+  useWatchContractEvent({
     address: REGISTRY.address,
     abi: REGISTRY.abi,
     eventName: "LifecycleTransitioned",
@@ -184,7 +198,7 @@ export function ActivityLog() {
           <p className="eyebrow">Onchain activity</p>
           <h2 id="activity-title" className="mt-2 text-2xl font-semibold tracking-tight">Activity</h2>
           <p className="mt-2 max-w-xl text-sm text-terminal-muted">
-            Deposited, Borrowed, Withdrawn, and Registry state changes, read directly from onchain logs.
+            Deposited, Borrowed, Withdrawn, Transferred, and Registry state changes, read directly from onchain logs.
           </p>
         </div>
       </div>
