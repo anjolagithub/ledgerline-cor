@@ -7,6 +7,23 @@ pragma solidity ^0.8.20;
 // releaser -- the old VaultAdapter's authorization is left in place
 // but the old instance is abandoned, same pattern as the previous
 // RobinhoodStockTokenAdapter redeploy.
+//
+// AUDIT-TRAIL NOTE: unlike this repo's other deploy/redeploy scripts,
+// there is no contracts/broadcast/RedeployVaultAdapter.s.sol/
+// directory for this one -- this is disclosed, not an oversight. The
+// deployerKey used to run this script (`new LedgerLineVaultAdapter`,
+// line below) is not the LendingAdapter owner, so the
+// setAuthorizedReleaser() call in this same run() reverted when run
+// via `forge script --broadcast`. The deploy itself succeeded; the
+// resulting instance is the live
+// 0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac (see docs/DEPLOYMENTS.md
+// and sdk/src/addresses.ts). Authorization was then completed
+// separately with the owner key via a manual `cast send ...
+// setAuthorizedReleaser(...)` call -- not a second forge script run,
+// so there is no second broadcast log to add. Both the deployment and
+// the authorization are real and independently verifiable live
+// on-chain via `cast call` against LendingAdapter.isAuthorizedReleaser
+// (do not fabricate a broadcast/ entry to paper over this gap).
 
 import {Script, console} from "forge-std/Script.sol";
 import {LedgerLineVaultAdapter} from "../src/LedgerLineVaultAdapter.sol";
