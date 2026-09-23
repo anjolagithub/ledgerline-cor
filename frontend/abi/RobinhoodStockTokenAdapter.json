@@ -165,6 +165,19 @@
   },
   {
     "type": "function",
+    "name": "sequencerCheckEnabled",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "sequencerUptimeFeed",
     "inputs": [],
     "outputs": [
@@ -223,6 +236,19 @@
         "name": "value",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setSequencerCheckEnabled",
+    "inputs": [
+      {
+        "name": "enabled",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "outputs": [],

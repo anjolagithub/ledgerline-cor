@@ -16,6 +16,7 @@ const CONTRACTS = [
   "LedgerLinePolicy",
   "LedgerLineLendingAdapter",
   "LedgerLineVaultAdapter",
+  "LedgerLineTransferAdapter",
   "RobinhoodStockTokenAdapter",
   "MockStockToken",
   "MockBorrowToken",

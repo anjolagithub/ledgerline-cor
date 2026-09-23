@@ -14,6 +14,7 @@ import {
   LedgerLinePolicyAbi,
   LedgerLineRegistryAbi,
   LedgerLineVaultAdapterAbi,
+  LedgerLineTransferAdapterAbi,
 } from "./abi";
 import { ROBINHOOD_TESTNET_ADDRESSES, type LedgerLineAddresses } from "./addresses";
 import { robinhoodChainTestnet } from "./chain";
@@ -47,12 +48,12 @@ export type WriteOptions = {
 };
 
 /// LedgerLineClient -- a thin, typed wrapper over LedgerLine's real
-/// deployed contracts (Registry, Policy, LendingAdapter, VaultAdapter),
-/// built on viem.
+/// deployed contracts (Registry, Policy, LendingAdapter, VaultAdapter,
+/// TransferAdapter), built on viem.
 ///
 /// AMOUNT CONVENTION (read this before calling any write method):
 /// every `amount` parameter on this client -- deposit, borrow,
-/// withdraw, and canExecute -- is an 18-decimal internal unit,
+/// withdraw, transfer, and canExecute -- is an 18-decimal internal unit,
 /// matching LedgerLine's own accounting convention (PositionEngine /
 /// RiskEngine / LedgerLineLendingAdapter all use this same
 /// convention internally). This is true regardless of any individual
@@ -254,6 +255,38 @@ export class LedgerLineClient {
       abi: LedgerLineVaultAdapterAbi,
       functionName: "withdraw",
       args: [amount],
+      account,
+      chain: this.chain,
+    });
+  }
+
+  // -----------------------------------------------------------------
+  // Writes -- TransferAdapter (transfer)
+  // -----------------------------------------------------------------
+
+  /// Reassigns `amount` (18-decimal, see class doc) of the caller's
+  /// position to `to` via TransferAdapter.transfer(). This is
+  /// LedgerLine's third, independent real consumer of the same
+  /// Policy/Registry -- it makes its own canExecute() call with
+  /// Action.TRANSFER (evaluated on lifecycle state, not borrowing
+  /// capacity, exactly like WITHDRAW) and, only after a non-BLOCK
+  /// decision, reassigns the already-custodied collateral's Registry
+  /// position from the caller to `to` via
+  /// LendingAdapter.transferPosition() -- no tokens move. The adapter
+  /// also reverts outright if the caller carries ANY outstanding
+  /// LendingAdapter debt, regardless of amount: unlike VaultAdapter's
+  /// remaining-capacity check, there is no recomputation here, because
+  /// the collateral is changing owners entirely. Returns a tx hash --
+  /// not confirmation; see waitForReceipt.
+  async transfer(to: Address, amount: bigint, options?: WriteOptions): Promise<Hash> {
+    const walletClient = this.requireWalletClient();
+    const account = this.resolveAccount(walletClient, options);
+
+    return walletClient.writeContract({
+      address: this.addresses.transferAdapter,
+      abi: LedgerLineTransferAdapterAbi,
+      functionName: "transfer",
+      args: [to, amount],
       account,
       chain: this.chain,
     });

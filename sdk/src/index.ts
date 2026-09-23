@@ -10,4 +10,5 @@ export {
   LedgerLinePolicyAbi,
   LedgerLineLendingAdapterAbi,
   LedgerLineVaultAdapterAbi,
+  LedgerLineTransferAdapterAbi,
 } from "./abi";

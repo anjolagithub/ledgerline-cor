@@ -1,4 +1,5 @@
-[
+// Copied verbatim from frontend/abi/LedgerLineTransferAdapter.json (produced by forge build + frontend/scripts/generate-abis.mjs). Do not hand-edit -- regenerate from the same source if the contract interface changes.
+export const LedgerLineTransferAdapterAbi = [
   {
     "type": "constructor",
     "inputs": [
@@ -79,8 +80,13 @@
   },
   {
     "type": "function",
-    "name": "withdraw",
+    "name": "transfer",
     "inputs": [
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "amount",
         "type": "uint256",
@@ -92,22 +98,22 @@
   },
   {
     "type": "event",
-    "name": "Withdrawn",
+    "name": "Transferred",
     "inputs": [
       {
-        "name": "user",
+        "name": "from",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "to",
         "type": "address",
         "indexed": true,
         "internalType": "address"
       },
       {
         "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "newRawBalance",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -143,6 +149,17 @@
   },
   {
     "type": "error",
+    "name": "OutstandingDebtBlocksTransfer",
+    "inputs": [
+      {
+        "name": "existingDebt",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "PolicyBlocked",
     "inputs": [
       {
@@ -151,21 +168,5 @@
         "internalType": "bytes32"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "WouldUnderCollateralizeDebt",
-    "inputs": [
-      {
-        "name": "existingDebt",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "remainingCapacity",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
   }
-]
+] as const;

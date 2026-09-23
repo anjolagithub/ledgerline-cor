@@ -2,6 +2,7 @@ import registryAbi from "../abi/LedgerLineRegistry.json";
 import policyAbi from "../abi/LedgerLinePolicy.json";
 import adapterAbi from "../abi/LedgerLineLendingAdapter.json";
 import vaultAdapterAbi from "../abi/LedgerLineVaultAdapter.json";
+import transferAdapterAbi from "../abi/LedgerLineTransferAdapter.json";
 import stockTokenAbi from "../abi/MockStockToken.json";
 import borrowTokenAbi from "../abi/MockBorrowToken.json";
 import type { Abi, Address } from "viem";
@@ -36,6 +37,11 @@ export const VAULT_ADAPTER = {
   abi: vaultAdapterAbi as Abi,
 };
 
+export const TRANSFER_ADAPTER = {
+  address: requireAddress(process.env.NEXT_PUBLIC_TRANSFER_ADAPTER_ADDRESS, "TRANSFER_ADAPTER"),
+  abi: transferAdapterAbi as Abi,
+};
+
 export const STOCK_TOKEN = {
   address: requireAddress(process.env.NEXT_PUBLIC_STOCK_TOKEN_ADDRESS, "STOCK_TOKEN"),
   abi: stockTokenAbi as Abi,
@@ -66,9 +72,9 @@ export function bpsToPercent(bps: bigint | undefined): string {
   return `${(Number(bps) / 100).toFixed(0)}%`;
 }
 
-// Human-readable mappings for LedgerLineLendingAdapter's actual custom
-// errors (src/LedgerLineLendingAdapter.sol). Not a fabricated mapping --
-// these are the exact error names that contract defines.
+// Human-readable mappings for LedgerLineLendingAdapter/VaultAdapter/
+// TransferAdapter's actual custom errors (src/*.sol). Not a fabricated
+// mapping -- these are the exact error names those contracts define.
 const KNOWN_ERRORS: Record<string, string> = {
   PolicyBlocked: "Blocked by policy",
   ExceedsPermittedAmount: "Exceeds permitted amount",
@@ -76,6 +82,8 @@ const KNOWN_ERRORS: Record<string, string> = {
   NoPosition: "No position -- deposit first",
   InvalidBps: "Invalid parameter value",
   ExceedsPosition: "Exceeds available position",
+  WouldUnderCollateralizeDebt: "Would leave debt uncollateralized",
+  OutstandingDebtBlocksTransfer: "Outstanding debt blocks transfer -- repay first",
 };
 
 export function decodeRevertReason(error: unknown): string {
