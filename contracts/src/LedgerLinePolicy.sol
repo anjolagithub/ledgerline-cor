@@ -83,6 +83,23 @@ contract LedgerLinePolicy is ILedgerLinePolicy, Ownable {
             });
         }
 
+        // TRANSFER reassigns which positionId owns a rawBalance -- no
+        // collateral leaves custody, so it is lifecycle-gated only,
+        // same as WITHDRAW. Debt safety for a TRANSFER is stricter than
+        // WITHDRAW's (any outstanding debt blocks it outright, not just
+        // debt exceeding remaining capacity) but that check depends on
+        // LendingAdapter.debt(), which canExecute() deliberately never
+        // reads -- it is enforced by TransferAdapter itself, mirroring
+        // how VaultAdapter enforces its own debt check on top of this
+        // same lifecycle-only ALLOW.
+        if (action == Action.TRANSFER) {
+            return PolicyResponse({
+                decision: Decision.ALLOW,
+                permittedAmount: position.rawBalance,
+                reason: REASON_OK
+            });
+        }
+
         uint256 positionValue = positionEngine.computePositionValue(
             position.rawBalance,
             asset.price,

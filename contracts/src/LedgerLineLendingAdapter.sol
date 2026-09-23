@@ -50,6 +50,9 @@ contract LedgerLineLendingAdapter is Ownable {
     event Borrowed(address indexed user, uint256 amount, uint256 newDebt);
     event Released(address indexed user, uint256 amount, uint256 newRawBalance, address indexed releaser);
     event ReleaserUpdated(address indexed releaser, bool authorized);
+    event PositionTransferred(
+        address indexed from, address indexed to, uint256 amount, uint256 newFromRawBalance, uint256 newToRawBalance
+    );
 
     error AssetNotInitialized();
     error NoPosition();
@@ -79,12 +82,16 @@ contract LedgerLineLendingAdapter is Ownable {
     }
 
     /// @notice Owner-controlled allowlist of contracts permitted to
-    /// trigger a custody release via releaseCollateral. Intended for
-    /// other LedgerLine consumers (e.g. VaultAdapter) that make their
-    /// own independent Policy.canExecute() decision and, only after
-    /// ALLOW, need this adapter's already-custodied tokens released --
-    /// centralizing custody here rather than duplicating token
-    /// transfers across every consumer contract.
+    /// trigger a custody release via releaseCollateral, OR a
+    /// no-custody position reassignment via transferPosition. Intended
+    /// for other LedgerLine consumers (e.g. VaultAdapter, TransferAdapter)
+    /// that make their own independent Policy.canExecute() decision and,
+    /// only after ALLOW, need this adapter -- the sole positionWriter --
+    /// to mutate Registry state on their behalf. Reused across both
+    /// cases rather than adding a second, parallel allowlist: the trust
+    /// boundary is identical (a consumer that has already checked
+    /// Policy and its own extra safety rules) even though transferPosition
+    /// moves no tokens.
     function setAuthorizedReleaser(address releaser, bool authorized) external onlyOwner {
         isAuthorizedReleaser[releaser] = authorized;
         emit ReleaserUpdated(releaser, authorized);
@@ -109,6 +116,41 @@ contract LedgerLineLendingAdapter is Ownable {
         collateralToken.safeTransfer(user, amount);
 
         emit Released(user, amount, newRawBalance, msg.sender);
+    }
+
+    /// @notice Reassigns `amount` of rawBalance from `from`'s position to
+    /// `to`'s position, at the given assetId. Moves no tokens -- the
+    /// collateral stays custodied here throughout, only Registry's
+    /// bookkeeping of which positionId owns it changes. Callable ONLY by
+    /// an authorized releaser (e.g. TransferAdapter), which is expected
+    /// to have already called Policy.canExecute() with Action.TRANSFER,
+    /// confirmed ALLOW, and independently verified `from` carries zero
+    /// debt before calling this.
+    ///
+    /// Two registry.setPosition calls in one function, rather than a new
+    /// Registry method: setPosition already accepts an arbitrary
+    /// rawBalance for any positionId from the one configured
+    /// positionWriter (this contract), so decreasing one position and
+    /// increasing another is just two ordinary writes with a balance
+    /// check in between -- no new Registry capability is required.
+    function transferPosition(address from, address to, uint256 amount) external {
+        if (!isAuthorizedReleaser[msg.sender]) revert NotAuthorizedReleaser(msg.sender);
+
+        uint256 fromPositionId = _positionId(from);
+        uint256 toPositionId = _positionId(to);
+
+        uint256 fromRawBalance = registry.getPosition(assetId, fromPositionId).rawBalance;
+        if (amount > fromRawBalance) revert InsufficientPosition(amount, fromRawBalance);
+
+        uint256 toRawBalance = registry.getPosition(assetId, toPositionId).rawBalance;
+
+        uint256 newFromRawBalance = fromRawBalance - amount;
+        uint256 newToRawBalance = toRawBalance + amount;
+
+        registry.setPosition(assetId, fromPositionId, newFromRawBalance);
+        registry.setPosition(assetId, toPositionId, newToRawBalance);
+
+        emit PositionTransferred(from, to, amount, newFromRawBalance, newToRawBalance);
     }
 
     /// @dev Converts an 18-decimal internal amount to the borrow token's
