@@ -38,7 +38,18 @@ Nothing here describes planned-but-unbuilt behavior.
 │ - real collateral custody  │ release │  - no token custody        │
 │ - debt accounting          │Collateral│  - calls Policy itself     │
 │ - Action.BORROW            │         │  - Action.WITHDRAW         │
+│                            │         │  - own debt-safety check   │
 └───────────────────────────┘         └───────────────────────────┘
+             ▲
+             │ transferPosition
+             │ (no tokens move)
+┌───────────────────────────┐
+│ LedgerLineTransferAdapter  │
+│  - no token custody        │
+│  - calls Policy itself     │
+│  - Action.TRANSFER         │
+│  - own, stricter debt check│
+└───────────────────────────┘
 
 ┌───────────────────────────┐   (deployed, NOT wired into the
 │ RobinhoodStockTokenAdapter │    live Registry-read path —
@@ -90,10 +101,14 @@ transitions are checked against a fixed, hardcoded graph
 Holds references to `registry`, `positionEngine`, `riskEngine` (set
 once in the constructor; no setter exists). `canExecute()` reads
 `AssetState` and `Position` from Registry, short-circuits to `BLOCK`
-if lifecycle isn't `ACTIVE`, branches on `Action.WITHDRAW` (lifecycle
-only, see `docs/POLICY.md`), and otherwise calls `PositionEngine` then
+if lifecycle isn't `ACTIVE`, branches on `Action.WITHDRAW` and
+`Action.TRANSFER` (both lifecycle only, structurally identical, see
+`docs/POLICY.md`), and otherwise (BORROW) calls `PositionEngine` then
 `RiskEngine` to derive a capacity and compare it against the requested
-`amount`. Policy never writes state anywhere and never moves funds.
+`amount`. Policy never writes state anywhere, never moves funds, and
+never reads debt for any action — each consumer that needs debt
+awareness (`LendingAdapter` for BORROW, `VaultAdapter` for WITHDRAW,
+`TransferAdapter` for TRANSFER) enforces that itself.
 
 ### `LedgerLineLendingAdapter`
 The first reference consumer. Holds real ERC-20 custody: `deposit()`
@@ -103,19 +118,43 @@ calls `Policy.canExecute`, additionally checks the caller's *own*
 `debt` mapping against `permittedAmount` (Policy alone only sees the
 newly requested amount, not existing debt — see `docs/POLICY.md`), and
 transfers `borrowToken` scaled to its real onchain decimals. Also
-exposes `releaseCollateral()`, callable only by addresses on its own
-`isAuthorizedReleaser` allowlist (set by the owner) — this is how a
-second consumer can move already-custodied collateral without
-duplicating custody logic.
+exposes `releaseCollateral()` and `transferPosition()`, both callable
+only by addresses on its own `isAuthorizedReleaser` allowlist (set by
+the owner, reused across both — the trust boundary is identical even
+though `transferPosition()` moves no tokens) — this is how a second
+and third consumer can mutate already-custodied collateral/positions
+without duplicating custody logic.
 
 ### `LedgerLineVaultAdapter`
 The second reference consumer. Holds no tokens itself. `withdraw()`
 checks the position exists and the request doesn't exceed the caller's
 raw balance, calls `Policy.canExecute` with `Action.WITHDRAW`, and —
-only on a non-`BLOCK` decision — calls
-`LendingAdapter.releaseCollateral()` to actually move funds. It has no
-owner and no access-control modifiers of its own; its only privileged
-relationship is being on `LendingAdapter`'s releaser allowlist.
+only on a non-`BLOCK` decision — reads `LendingAdapter.debt(msg.sender)`
+directly and, if any debt exists, reverts with
+`WouldUnderCollateralizeDebt` unless the position's *remaining*
+borrowing capacity after the withdrawal would still cover it. Only
+then does it call `LendingAdapter.releaseCollateral()` to actually
+move funds. It has no owner and no access-control modifiers of its
+own; its only privileged relationship is being on `LendingAdapter`'s
+releaser allowlist.
+
+### `LedgerLineTransferAdapter`
+The third reference consumer, and the first with a custody mechanic
+genuinely different from the other two: it moves no tokens at all.
+`transfer(to, amount)` checks the position exists and the request
+doesn't exceed the caller's raw balance, calls `Policy.canExecute`
+with `Action.TRANSFER`, and — only on a non-`BLOCK` decision — reads
+`LendingAdapter.debt(msg.sender)` directly and reverts with
+`OutstandingDebtBlocksTransfer` if that debt is anything above zero at
+all (stricter than `VaultAdapter`'s remaining-capacity check, since
+collateral changing owners invalidates whatever LTV math applied to
+the original owner's debt — there is nothing to recompute). Only then
+does it call `LendingAdapter.transferPosition()`, which reassigns
+`rawBalance` from the caller's `positionId` to `to`'s in `Registry` —
+the collateral itself never leaves `LendingAdapter`'s custody. Like
+`VaultAdapter`, it has no owner and no access-control modifiers of its
+own; its only privileged relationship is being on `LendingAdapter`'s
+releaser allowlist.
 
 ### `RobinhoodStockTokenAdapter`
 Implements `IAssetStateAdapter` (`getAssetState(assetId) -> AssetState`)
@@ -145,9 +184,32 @@ currently configured.
    `Policy.canExecute(assetId, positionId, WITHDRAW, amount)`.
 3. Policy returns `ALLOW` (full position) if lifecycle is `ACTIVE`, or
    `BLOCK` otherwise — capacity is never computed for this action.
-4. On non-`BLOCK`, VaultAdapter calls `LendingAdapter.releaseCollateral`,
+4. On non-`BLOCK`, VaultAdapter reads `LendingAdapter.debt(msg.sender)`
+   directly. If debt is `0`, it proceeds immediately. If debt is
+   nonzero, it recomputes the position's remaining value/capacity as
+   of *after* this withdrawal (via `PositionEngine`/`RiskEngine`
+   again) and reverts with `WouldUnderCollateralizeDebt` unless that
+   remaining capacity still covers the existing debt.
+5. Only then does VaultAdapter call `LendingAdapter.releaseCollateral`,
    which updates the shared `Registry` position and transfers
    `collateralToken` back to the user.
+
+## Data flow, end to end (TRANSFER)
+
+1. User calls `TransferAdapter.transfer(to, amount)`.
+2. TransferAdapter reads the position directly from `Registry` and
+   calls `Policy.canExecute(assetId, positionId, TRANSFER, amount)`.
+3. Policy returns `ALLOW` (full position) if lifecycle is `ACTIVE`, or
+   `BLOCK` otherwise — capacity is never computed for this action
+   either.
+4. On non-`BLOCK`, TransferAdapter reads `LendingAdapter.debt(msg.sender)`
+   directly and reverts with `OutstandingDebtBlocksTransfer` if that
+   debt is anything above zero — no recomputation, unlike WITHDRAW's
+   check above.
+5. Only then does TransferAdapter call `LendingAdapter.transferPosition`,
+   which decreases the caller's `rawBalance` and increases `to`'s by
+   the same amount in `Registry` — no token transfer occurs anywhere
+   in this flow.
 
 ## State ownership
 
@@ -158,6 +220,7 @@ currently configured.
 | `debt[user]` | `LedgerLineLendingAdapter` | the adapter itself, in `borrow()` |
 | `isAuthorizedReleaser[addr]` | `LedgerLineLendingAdapter` | contract owner only |
 | Nothing | `LedgerLineVaultAdapter` | — it is stateless besides its immutable contract references |
+| Nothing | `LedgerLineTransferAdapter` | — it is stateless besides its immutable contract references |
 | Nothing | `LedgerLinePolicy` | — stateless besides its immutable-in-practice contract references |
 
 ## Dependency graph (imports)
@@ -165,5 +228,6 @@ currently configured.
 - `LedgerLinePolicy` → `ILedgerLineRegistry`, `IPositionEngine`, `IRiskEngine`
 - `LedgerLineLendingAdapter` → `ILedgerLineRegistry`, `ILedgerLinePolicy`, OpenZeppelin `IERC20`/`IERC20Metadata`/`SafeERC20`/`Ownable`
 - `LedgerLineVaultAdapter` → `ILedgerLineRegistry`, `ILedgerLinePolicy`, `LedgerLineLendingAdapter` (concrete, for `releaseCollateral`)
+- `LedgerLineTransferAdapter` → `ILedgerLineRegistry`, `ILedgerLinePolicy`, `LedgerLineLendingAdapter` (concrete, for `transferPosition`)
 - `RobinhoodStockTokenAdapter` → `IAssetStateAdapter`, `IRobinhoodStockToken`, `AggregatorV3Interface` (Chainlink-shaped), OpenZeppelin `Ownable`
 - All shared types/enums/errors live in `contracts/src/interfaces/LedgerLineTypes.sol`

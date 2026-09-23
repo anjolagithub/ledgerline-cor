@@ -7,6 +7,18 @@ import { formatUnits18, bpsToPercent, LIFECYCLE_LABELS } from "./contracts";
 // broadcast file if the contracts are ever redeployed.
 export const REGISTRY_DEPLOY_BLOCK = 122446927n;
 export const LENDING_ADAPTER_DEPLOY_BLOCK = 122446946n;
+
+// NOT the deploy block of the current VAULT_ADAPTER.address. That address
+// is the debt-safety-fixed instance redeployed by
+// contracts/script/RedeployVaultAdapter.s.sol (commit 9fa2c38), which has
+// no broadcast log anywhere in this repo (see docs/DEPLOYMENTS.md) -- its
+// real deploy block is genuinely unrecorded, not just unfetched here. This
+// value is the ABANDONED pre-fix instance's deploy block instead, kept
+// deliberately as a safe (if not tight) lower bound: getLogs against the
+// current address starting from a block before that address had any code
+// simply returns nothing for the gap, so this stays correct, just less
+// efficient than the real deploy block would be. Replace with the actual
+// value if RedeployVaultAdapter.s.sol's broadcast log ever becomes available.
 export const VAULT_ADAPTER_DEPLOY_BLOCK = 122446953n;
 
 export const EXPLORER_TX_BASE_URL = "https://explorer.testnet.chain.robinhood.com/tx";

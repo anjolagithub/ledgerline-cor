@@ -1,10 +1,18 @@
 # LedgerLine Core — Frontend Design Specification
 
 Status: implementation-ready specification, produced from the Phase 8
-frontend audit. No code has been written against this yet. Grounded in
-the actual current codebase (contracts, existing frontend scaffold) —
-nothing here invents backend data, events, or contract behavior that
-doesn't already exist.
+frontend audit. Most of the P0/P1 items below (`PolicyEquation`,
+`PolicyVerdict`, `TransactionStatus`, the Activity view and
+`LifecycleBadge`) have since been implemented in
+`frontend/components/` — this document is kept as the design record
+those components were built against, not as a "not started yet"
+status. Sections not yet implemented (e.g. `/admin`'s lifecycle-
+dropdown filtering and transaction feedback, the accessibility pass,
+responsive testing below desktop) are called out inline where they
+remain open. Grounded in the actual current codebase (contracts,
+existing frontend scaffold) at the time it was written — nothing here
+invents backend data, events, or contract behavior that doesn't
+already exist.
 
 ---
 

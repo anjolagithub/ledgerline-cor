@@ -26,9 +26,9 @@ function canExecute(
   could use any scheme.
 - **`action`** — one of `BORROW`, `WITHDRAW`, `TRANSFER`,
   `INCREASE_LEVERAGE`, `LIQUIDATE` (`Action` enum,
-  `LedgerLineTypes.sol`). Only `BORROW` and `WITHDRAW` have real
-  behavior today; the other three values exist in the enum but have no
-  wired logic anywhere in the contracts.
+  `LedgerLineTypes.sol`). `BORROW`, `WITHDRAW`, and `TRANSFER` all have
+  real behavior today; `INCREASE_LEVERAGE` and `LIQUIDATE` exist in the
+  enum but have no wired logic anywhere in the contracts.
 - **`amount`** — the amount the caller wants to execute, as an
   18-decimal fixed-point internal unit, regardless of any real token's
   actual decimals. This convention is enforced by callers, not by
@@ -141,35 +141,95 @@ withdraws an amount that would be "over capacity" if the action were
 borrow-gated, and confirms it still succeeds.
 
 One consequence worth stating plainly (see also `docs/SECURITY.md`):
-**WITHDRAW does not check outstanding debt.** A user who has borrowed
-against their position can still withdraw the underlying collateral,
-because neither `Policy` nor `VaultAdapter` ever reads
-`LendingAdapter.debt`. This is the real, current, bounded scope of the
-two-consumer proof — it demonstrates genuine per-action policy
-differentiation through the same `canExecute()` call, not a
-cross-consumer solvency system.
+**`Policy.canExecute` itself does not check outstanding debt for
+WITHDRAW** — `Policy` never reads `LendingAdapter.debt` for any
+action, by design (see the BORROW section above). This was true
+without qualification through Phase 10, but is no longer the full
+picture: as of commit `9fa2c38`, `LedgerLineVaultAdapter.withdraw()`
+adds its **own** separate debt-safety check on top of Policy's
+lifecycle-only `ALLOW` — after receiving a non-`BLOCK` decision, it
+reads `LendingAdapter.debt(msg.sender)` directly and, if any debt
+exists, recomputes the position's remaining borrowing capacity after
+the withdrawal and reverts with `WouldUnderCollateralizeDebt` if that
+remaining capacity would fall below the existing debt. A withdrawal
+that leaves enough capacity to still cover existing debt still
+succeeds; one that wouldn't now reverts. This is the real, current,
+bounded scope of the three-consumer proof — `Policy` itself stays
+debt-agnostic for every action, exactly as designed, while the
+individual consumer that has legitimate visibility into both position
+and cross-contract debt (`VaultAdapter`) enforces the additional
+safety property itself. Tested directly:
+`LedgerLineVaultAdapter.t.sol::test_withdrawBlockedIfWouldUnderCollateralizeDebt`
+and `test_withdrawAllowedIfDebtStillCovered`.
 
-## Why BORROW and WITHDRAW are different policies
+## TRANSFER behavior
+
+```solidity
+if (action == Action.TRANSFER) {
+    return PolicyResponse({decision: ALLOW, permittedAmount: position.rawBalance, reason: REASON_OK});
+}
+```
+
+Structurally identical to the WITHDRAW branch above: once lifecycle is
+confirmed `ACTIVE`, a transfer request is **always** `ALLOW`ed up to
+the caller's full recorded position, with capacity, collateral
+factor, and risk adjustment never consulted — reassigning which
+`positionId` owns a `rawBalance` is, like redeeming it, a pure
+lifecycle question rather than a capacity one. `Policy` itself
+similarly stays debt-agnostic for this action.
+
+The debt rule enforced outside `Policy`, by `LedgerLineTransferAdapter`
+itself, is **stricter** than `VaultAdapter`'s: rather than recomputing
+whether *remaining* capacity would still cover existing debt,
+`TransferAdapter.transfer()` reads `LendingAdapter.debt(msg.sender)`
+and reverts with `OutstandingDebtBlocksTransfer` if that debt is
+anything above zero at all, regardless of the amount requested or the
+position's actual size. Reasoning: a withdrawal leaves the same owner
+holding both the reduced collateral and the debt, so a remaining-
+capacity check is meaningful; a transfer hands the collateral to a
+*different* owner entirely, so whatever LTV math applied to the
+original owner's debt no longer means anything once that collateral
+changes hands — there is nothing to recompute. Tested directly:
+`LedgerLineTransferAdapter.t.sol::test_transferBlockedWithAnyOutstandingDebt`
+(even $1 of debt blocks any transfer amount) and
+`test_transferAllowedWithZeroDebt`.
+
+## Why BORROW, WITHDRAW, and TRANSFER are different policies
 
 They're different economic questions answered by the same function:
 BORROW asks "how much *new* value can this position responsibly
 support," which depends on price, collateral factor, and risk
-adjustment; WITHDRAW asks "is this asset in a state where redeeming
-your own already-recorded balance is currently permitted," which is a
-pure lifecycle question. Proving `canExecute()` genuinely branches
-between them — rather than every consumer independently reimplementing
-"is this allowed" — is precisely what Phase 10 (`LedgerLineVaultAdapter`)
-was built to demonstrate.
+adjustment; WITHDRAW and TRANSFER both ask "is this asset in a state
+where acting on your own already-recorded balance is currently
+permitted," which is a pure lifecycle question — they differ from each
+other only in what happens *outside* `Policy`, in the consumer's own
+additional debt-safety check. Proving `canExecute()` genuinely
+branches between these — rather than every consumer independently
+reimplementing "is this allowed" — is precisely what Phase 10
+(`LedgerLineVaultAdapter`) and Phase 11 (`LedgerLineTransferAdapter`)
+were built to demonstrate.
 
-## Tests proving both consumers share the same policy core
+## Tests proving all three consumers share the same policy core
 
-- `LedgerLineVaultAdapter.t.sol::test_borrowBehaviorCompletelyUnchanged`
-  — adding the WITHDRAW branch didn't alter BORROW's behavior at all.
+- `LedgerLineVaultAdapter.t.sol::test_borrowBehaviorCompletelyUnchanged`,
+  `LedgerLineTransferAdapter.t.sol::test_borrowBehaviorCompletelyUnchanged`
+  — adding the WITHDRAW branch, then the TRANSFER branch, didn't alter
+  BORROW's behavior at all.
+- `LedgerLineTransferAdapter.t.sol::test_withdrawBehaviorCompletelyUnchanged`
+  — adding TRANSFER didn't alter WITHDRAW's behavior either.
 - `LedgerLineVaultAdapter.t.sol::test_withdrawIgnoresCapacityEntirely`
   — WITHDRAW is genuinely not capacity-gated.
-- `LedgerLineVaultAdapter.t.sol::test_withdrawBlockedWhenNonActive` —
-  the same lifecycle short-circuit applies to both actions through the
-  same `canExecute` code path.
+- `LedgerLineVaultAdapter.t.sol::test_withdrawBlockedWhenNonActive`,
+  `LedgerLineTransferAdapter.t.sol::test_transferBlockedWhenNonActive` —
+  the same lifecycle short-circuit applies to all three actions through
+  the same `canExecute` code path.
+- `LedgerLineVaultAdapter.t.sol::test_withdrawBlockedIfWouldUnderCollateralizeDebt`,
+  `test_withdrawAllowedIfDebtStillCovered` — VaultAdapter's own
+  remaining-capacity debt check, layered on top of Policy's
+  lifecycle-only ALLOW.
+- `LedgerLineTransferAdapter.t.sol::test_transferBlockedWithAnyOutstandingDebt`,
+  `test_transferAllowedWithZeroDebt` — TransferAdapter's own, stricter
+  any-debt-blocks-it-all check, layered the same way.
 - `LedgerLineDemo.t.sol::test_fullDemoFlow` — full BORROW lifecycle
   (ALLOW → LIMIT as risk parameters tighten → BLOCK on lifecycle change
   → ALLOW again), against the real `LedgerLineRegistry`/`LedgerLinePolicy`.
