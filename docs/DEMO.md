@@ -1,18 +1,18 @@
 # Demo Walkthrough
 
-A judge-facing walkthrough of the four core flows, run against the
-live V2 deployment on Robinhood Chain testnet (`docs/DEPLOYMENTS.md`)
+A judge-facing walkthrough of five core flows, run against the live
+V2 deployment on Robinhood Chain testnet (`docs/DEPLOYMENTS.md`)
 through the frontend's Policy Console (`/app`) and Activity log
 (`/app/activity`).
 
-> **Transaction hashes below are placeholders.** They can only come
-> from actually performing each action through the live frontend with
-> a real wallet — they don't exist anywhere in this repository (Foundry
-> broadcast files only record *deployment* transactions, not user
-> interactions), and none are fabricated here. Replace each
-> `<TX_HASH_...>` placeholder with the real hash after performing that
-> action against the current V2 addresses, then this document is
-> accurate rather than illustrative.
+> **Status of the hashes below:** Deposit, ALLOW borrow, and Vault
+> withdrawal each have a real transaction hash from actually
+> performing that action through the live frontend with a real
+> wallet — none are fabricated. The LIMIT borrow step and the Transfer
+> debt-safety step have **no hash at all, by design**, not because
+> they're still pending: see each section for why. No successful
+> (non-blocked) Transfer hash exists yet either — stated plainly below
+> rather than filled with a placeholder.
 
 Every hash links to Robinhood Chain testnet's explorer:
 `https://explorer.testnet.chain.robinhood.com/tx/<hash>`.
@@ -36,7 +36,7 @@ approve, then deposit. This is a real `safeTransferFrom` of TSLA into
 recording the new raw balance. The `Deposited` event appears
 immediately in the Activity log.
 
-- Explorer: `https://explorer.testnet.chain.robinhood.com/tx/<TX_HASH_DEPOSIT>`
+- Explorer: `https://explorer.testnet.chain.robinhood.com/tx/0x271b0e52fc14b757e0b22259caea2ec2cf4dc3db365fc98fa7af009ad687f8fe`
 
 ## 2. ALLOW borrow
 
@@ -48,23 +48,27 @@ and real USDG (6-decimal, correctly scaled from the 18-decimal
 request — see `docs/INTEGRATIONS.md`) is transferred to the wallet.
 The `Borrowed` event appears in the Activity log.
 
-- Explorer: `https://explorer.testnet.chain.robinhood.com/tx/<TX_HASH_BORROW_ALLOW>`
+- Explorer: `https://explorer.testnet.chain.robinhood.com/tx/0xf0b1e5553f58d6ba1cfe6782d4b386a76e0d54167e5ae6dbb7cb9dbb7127540c`
 
 ## 3. LIMIT / reverted borrow
 
 Request a USDG amount that exceeds the position's effective capacity.
 `canExecute` returns `LIMIT` — LedgerLine never silently clamps a
 request — and the Policy Console shows the verdict and the actual
-maximum permitted amount before you'd even submit a transaction. If
-submitted anyway, `LendingAdapter.borrow()` reverts with
-`ExceedsPermittedAmount`. As `frontend/lib/activity.ts` notes
-explicitly: a reverted transaction leaves **no onchain event** — the
-Activity log correctly shows nothing for this step, which is itself
-the point (only successful actions are ever recorded onchain).
+maximum permitted amount before you'd even submit a transaction.
 
-- Explorer: `https://explorer.testnet.chain.robinhood.com/tx/<TX_HASH_BORROW_LIMIT_REVERTED>`
-  (a reverted transaction still has a real hash and appears on the
-  explorer as "Failed" — it just emits no `Borrowed` event)
+**No hash exists for this step, by design, not because it's pending.**
+`BorrowForm` disables the submit button entirely whenever the
+evaluated decision isn't `ALLOW` (it reads "Preview only -- adjust
+amount"), so through the actual live frontend this request never
+reaches `writeContract` at all — it is never signed, never submitted,
+and never broadcast. (A raw, direct `LendingAdapter.borrow()` call
+bypassing the frontend would still revert with `ExceedsPermittedAmount`
+and would get a real, minable hash showing "Failed" on the explorer —
+but that is not what this judge-facing walkthrough demonstrates.) As
+`frontend/lib/activity.ts` notes explicitly, a reverted transaction
+would leave no onchain event either way — the Activity log correctly
+shows nothing for this step, which is itself the point.
 
 ## 4. Vault withdrawal
 
@@ -79,7 +83,46 @@ appears in the Activity log. Note (see `docs/SECURITY.md`): this
 succeeds regardless of any outstanding USDG debt from step 2 — that is
 documented, tested behavior, not a bug in this walkthrough.
 
-- Explorer: `https://explorer.testnet.chain.robinhood.com/tx/<TX_HASH_WITHDRAW>`
+- Explorer: `https://explorer.testnet.chain.robinhood.com/tx/0xfbb0095b7dcf6a17c9f324879bf082a04c36db53e24d9e8b0fc33080f4c0bdf3`
+
+## 5. Transfer blocked by outstanding debt
+
+With an outstanding USDG debt on the position (from step 2), attempt
+a `TransferAdapter.transfer(to, amount)`
+(`0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943`) for any amount. Per
+`docs/POLICY.md`/`docs/SECURITY.md`, `Action.TRANSFER` is
+lifecycle-gated only through `canExecute` — same as WITHDRAW — but
+`TransferAdapter` itself independently checks
+`LendingAdapter.debt(msg.sender)` and blocks the transfer outright if
+that debt is anything above zero, regardless of the amount requested
+or the position's actual size. This is a stricter rule than
+`VaultAdapter`'s (which only requires *remaining* capacity to still
+cover debt): collateral changing owners invalidates whatever LTV math
+applied to the original owner's debt, so there is nothing to
+recompute.
+
+Confirmed live two ways:
+
+- **Direct `cast send`** against `TransferAdapter` from an account
+  carrying $22 of outstanding debt reverted with
+  `OutstandingDebtBlocksTransfer(22000000000000000000)` — correctly
+  blocked.
+- **Live UI**: the Transfer panel on the Policy Console showed
+  "Outstanding debt blocks transfer -- repay first" and the submit
+  button was disabled, matching `TransferAdapter.sol`'s check exactly
+  (see `frontend/components/TransferForm.tsx`).
+
+**No hash exists for this step, by design** — same reasoning as step
+3: a call that reverts is never actually broadcast (a `cast send`
+against a call Foundry/the RPC estimates will revert fails at gas
+estimation and never gets mined; the live UI's disabled submit button
+prevents `writeContract` from ever being called at all). **No
+successful (non-blocked) transfer hash exists yet either** — that
+would require a wallet with zero debt actually performing a transfer,
+which hasn't been done through the live frontend as of this writing.
+Stated here plainly rather than filled with a fabricated hash.
+
+- Explorer: n/a — no transaction was ever broadcast for this step.
 
 ## Verifying independently
 

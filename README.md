@@ -44,7 +44,7 @@ itself; that's the calling contract's job. See
 [`docs/POLICY.md`](docs/POLICY.md) for the exact decision rules per
 action.
 
-## The two-consumer proof
+## The three-consumer proof
 
 The core claim of this project is that the *same*, unmodified
 Policy/Registry/engines stack can back more than one real, independent
@@ -59,20 +59,34 @@ consumer contract:
   ALLOW/BLOCK decision evaluated purely on asset lifecycle (not
   borrowing capacity), and only then asks `LendingAdapter` to release
   the already-custodied collateral it doesn't itself hold.
+- **`LedgerLineTransferAdapter`** — the third reference consumer, and
+  the first with a mechanic genuinely different from the other two:
+  it moves no tokens at all. It calls the same `canExecute()` with
+  `Action.TRANSFER` (lifecycle-gated only, same rule as WITHDRAW), and
+  on ALLOW reassigns which `positionId` in `Registry` owns a given
+  `rawBalance` — the underlying collateral never leaves
+  `LendingAdapter`'s custody. Its own debt-safety rule is stricter
+  than `VaultAdapter`'s: any outstanding debt at all blocks the
+  transfer outright (not a recomputed remaining-capacity check),
+  because collateral changing owners invalidates whatever LTV math
+  applied to the original owner's debt.
 
-Adding the second consumer required **zero changes** to
+Adding the second and third consumers required **zero changes** to
 `LedgerLineRegistry` or either Stylus engine, and exactly one addition
-to `LedgerLinePolicy`: a real per-action branch for `Action.WITHDRAW`
-(previously reserved but unimplemented). `docs/POLICY.md` and the test
-suite (`LedgerLineVaultAdapter.t.sol`) show both consumers exercising
-the same policy core side by side.
+to `LedgerLinePolicy` each time: a real per-action branch for
+`Action.WITHDRAW`, then the same pattern again for `Action.TRANSFER`
+(both previously reserved but unimplemented). `docs/POLICY.md` and the
+test suites (`LedgerLineVaultAdapter.t.sol`,
+`LedgerLineTransferAdapter.t.sol`) show all three consumers exercising
+the same policy core side by side, with the earlier consumers'
+behavior unchanged and re-tested each time a new one was added.
 
-A third proof point exists in `sdk/` — `@ledgerline/core`, a typed
-TypeScript client (`LedgerLineClient`) that talks to all four deployed
-contracts (Registry, Policy, LendingAdapter, VaultAdapter) through the
-same interfaces the Solidity consumers use, so a third kind of
-consumer (an offchain script, a bot, another frontend) doesn't need to
-reimplement any of this.
+A fourth proof point exists in `sdk/` — `@ledgerline/core`, a typed
+TypeScript client (`LedgerLineClient`) that talks to all five deployed
+contracts (Registry, Policy, LendingAdapter, VaultAdapter,
+TransferAdapter) through the same interfaces the Solidity consumers
+use, so an entirely different kind of consumer (an offchain script, a
+bot, another frontend) doesn't need to reimplement any of this.
 
 ## Live on Robinhood Chain testnet
 
@@ -84,6 +98,7 @@ Chain ID **46630**. Real deployment, not a simulation:
 | `LedgerLinePolicy` | `0x22fA5c1C36Cc1F7557B932dE7aCDa354ee4F6F52` |
 | `LedgerLineLendingAdapter` | `0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97` |
 | `LedgerLineVaultAdapter` | `0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac` |
+| `LedgerLineTransferAdapter` | `0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943` |
 
 Full address list, block numbers, and the abandoned V1 deployment's
 history are in [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md).
@@ -153,16 +168,38 @@ coverage, or production readiness.
 ## Repo layout
 
 - `contracts/` — Foundry project (Solidity). Registry, Policy,
-  LendingAdapter, VaultAdapter, the Robinhood Stock Token adapter,
-  interfaces, mocks, tests, and deployment scripts.
+  LendingAdapter, VaultAdapter, TransferAdapter, the Robinhood Stock
+  Token adapter, interfaces, mocks, tests, and deployment scripts.
 - `stylus/` — Rust/Arbitrum Stylus workspace (`position-engine`,
   `risk-engine`) — the two stateless computation contracts Policy calls.
 - `sdk/` — TypeScript SDK (`@ledgerline/core`), a typed viem client
-  over the four deployed contracts.
+  over the five deployed contracts.
 - `frontend/` — Next.js judge-facing demo app (Policy Console +
   Activity log) against the live V2 testnet deployment.
 - `docs/` — architecture, policy, integration, security, deployment,
   and demo documentation (see below).
+
+## Roadmap
+
+**Naming disclosure:** LedgerLine is a working name for this
+buildathon submission, not an established or trademarked product
+name — treat it as provisional.
+
+**Natural next additions, given the current, disclosed scope
+boundaries:**
+
+- A `repay()` function on `LedgerLineLendingAdapter`. Per
+  `docs/SECURITY.md`'s known limitations, debt is currently permanent
+  once borrowed — there is no way to reduce it. Adding repayment is
+  the most natural next addition given that gap.
+- A fourth consumer action beyond BORROW, WITHDRAW, and the
+  now-proven TRANSFER (`LedgerLineTransferAdapter`) — for example
+  `Action.LIQUIDATE`, already reserved in the `Action` enum
+  (`contracts/src/interfaces/LedgerLineTypes.sol`) but with no
+  consumer or `Policy` branch implemented yet. TRANSFER's addition
+  required zero changes to `Registry` or either Stylus engine and
+  exactly one new branch in `LedgerLinePolicy` — the same pattern a
+  LIQUIDATE consumer would be expected to follow.
 
 ## Further reading
 

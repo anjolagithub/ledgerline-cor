@@ -116,6 +116,17 @@ updated before the external `safeTransfer` call.
    full redeploy.
 6. **No professional audit has been performed on any part of this
    codebase.**
+7. **`LedgerLineLendingAdapter` has no `repay()` function, or any
+   other way to reduce `debt` once borrowed.** Debt is permanent for a
+   given position under the current contracts — there is no path to
+   pay down or clear it. This is a real, disclosed gap in the current
+   scope, not by-design the way the WITHDRAW/debt interaction is
+   (that one is an intentional decision, tested and documented above
+   and in `docs/POLICY.md`; this one is simply missing functionality).
+   It also means `TransferAdapter`'s "any outstanding debt blocks the
+   transfer" rule and `VaultAdapter`'s debt-safety check are currently
+   permanent once triggered for a position — a position that has ever
+   borrowed anything can never again pass either check.
 
 ## Fixed since the last revision of this document
 
