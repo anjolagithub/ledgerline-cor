@@ -16,42 +16,45 @@ Source of truth: `contracts/broadcast/DeployTestnetRealV2.s.sol/46630/run-latest
 | Contract | Address | Deploy block | Deploy tx |
 |---|---|---|---|
 | `LedgerLineLendingAdapter` | `0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97` | 122446946 | `0x5bde0152f9602b912d62ff7261ff04959a4b73752b7fcbb8817ce1b06923a699` |
-| `LedgerLineVaultAdapter` (live, pre-debt-check build) | `0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67` | not recorded in this repo | not recorded in this repo |
+| `LedgerLineVaultAdapter` (debt-safe) | `0xfF7EC5218730AdbCAa14cdf205cc57F97D335A6b` | 123626254 | `0xe19a7c0bb535d14af7215156d6bf991438e6ba2fc9a50c982a14bf6e20723d67` |
 | `LedgerLineTransferAdapter` | `0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943` | 123081162 | `0x09db3fe80e2c5fba8b21d71cfbea093fb252333de553dc9789a46909f8c5997a` |
 | `RobinhoodStockTokenAdapter` | `0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9` | 122531798 | `0xdebba93e4771b6bcaee54eb3c2c7503c77ad1e672c95c6c4212e4ef77307b49c` |
 | `MockChainlinkFeed` (reference price for the above) | `0x4548F12F03c3123983b046EAc237876E03A2D7e3` | 122446900 | `0x8eb349b06a4c191efb88bc3aea99f24e9d686c091fed61a24821ddfbbec72713` |
 
-**`LedgerLineVaultAdapter`: the debt-safe redeploy never reached
-chain.** `contracts/script/RedeployVaultAdapter.s.sol` was meant to
-redeploy VaultAdapter after commit `9fa2c38` added a debt-safety check
-to `withdraw()`. Checked live on 2026-09-24:
+**`LedgerLineVaultAdapter` redeploy (debt-safety fix, commit `9fa2c38`).**
+The first attempt with `contracts/script/RedeployVaultAdapter.s.sol`
+deployed and authorized in one `forge script --broadcast` run. It was
+run with a key that isn't the LendingAdapter owner, so the `onlyOwner`
+`setAuthorizedReleaser` call reverted in simulation and forge broadcast
+nothing, including the deploy. The console-logged address
+(`0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac`) never had bytecode, but
+the owner authorized it by hand anyway (tx
+`0x43c33c83f43a5521610a98c84ad933aa8174afbaa06c7bfb480e2f8ee65acfbc`,
+block 122912429). Until the fix below, the live WITHDRAW consumer was
+still the pre-fix instance, which does not check debt.
 
-- `0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac`, the address previously
-  recorded here as the redeployed instance, has **no bytecode**
-  (`cast code` returns `0x`).
-- `LendingAdapter.isAuthorizedReleaser(0x0F70…93ac)` is `true`, so the
-  manual `cast send setAuthorizedReleaser` step did run, against an
-  empty address.
-- The pre-fix instance `0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67` has
-  bytecode, is still an authorized releaser, and is the contract the
-  recorded Vault withdrawal in `docs/DEMO.md` actually called.
+Fixed on 2026-09-24 by splitting deploy and authorization into
+separately verified steps. The script is now deploy-only and signs via
+`--account`. Every step below was confirmed against live chain state,
+not just the script output:
 
-Likely cause: `forge script --broadcast` broadcasts nothing if any call
-in `run()` reverts during simulation. The script's own comment records
-that its `setAuthorizedReleaser` call reverted (the deployer key isn't
-the LendingAdapter owner), so the `new LedgerLineVaultAdapter` was only
-simulated and its console-logged address was never deployed.
+| Step | Tx | Block | Result |
+|---|---|---|---|
+| 1. Deploy debt-safe `LedgerLineVaultAdapter` | `0xe19a7c0bb535d14af7215156d6bf991438e6ba2fc9a50c982a14bf6e20723d67` | 123626254 | `0xfF7E…5A6b` has bytecode containing `WouldUnderCollateralizeDebt`; wired to the Registry, Policy, and LendingAdapter above, `assetId` 1 |
+| 2. Authorize new instance (`setAuthorizedReleaser(0xfF7E…5A6b, true)`) | `0xf8489054d8524a7c23f0e20055976f8fe52215c589a79060fb6cb3ede9d11f18` | 123628689 | `isAuthorizedReleaser` → `true` |
+| 3. Revoke pre-fix instance (`setAuthorizedReleaser(0x5d27…8D67, false)`) | `0x28d92ffd828868c46545e6ab1a7e83e996dce4df3e07550b106340b8559542fb` | 123628784 | `isAuthorizedReleaser` → `false` |
+| 4. Revoke empty-address authorization (`setAuthorizedReleaser(0x0F70…93ac, false)`) | `0x4a49154471aad7889fa8653569b01a5537dad6a9c7dd371b88a2bcacfb30725d` | 123628915 | `isAuthorizedReleaser` → `false` |
 
-**Live WITHDRAW consumer:** the pre-fix instance above. It gates on
-`canExecute(..., Action.WITHDRAW, ...)` but does **not** check
-outstanding `LendingAdapter` debt. To fix: deploy the current
-`LedgerLineVaultAdapter` for real, authorize it with the LendingAdapter
-owner key, revoke `0x5d27…8D67`'s releaser authorization, and point
-`sdk/src/addresses.ts` / `NEXT_PUBLIC_VAULT_ADAPTER_ADDRESS` at it.
+Steps 2–4 were sent from the LendingAdapter owner
+(`0x00dC0f3ff1F2bca6b3d007684cC25a766c9815f4`), authorize-first so
+`withdraw` never lost its authorized consumer. Step 4 closes a latent
+risk: an authorized address with no code could later have code
+deployed to it by whoever holds the key it was derived from.
 
-| Contract | Address | Status |
+| Contract | Old address | Status |
 |---|---|---|
-| `LedgerLineVaultAdapter` (intended debt-safe redeploy) | `0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac` | **No code on chain.** Authorized as a releaser anyway; do not use |
+| `LedgerLineVaultAdapter` (pre-fix) | `0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67` | Abandoned, releaser authorization revoked. `withdraw()` did not check debt |
+| `LedgerLineVaultAdapter` (failed redeploy) | `0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac` | Never deployed (no code), releaser authorization revoked |
 
 `LedgerLineTransferAdapter` was deployed fresh (not a redeploy of an
 earlier instance — TRANSFER never had a consumer before) by
@@ -97,7 +100,7 @@ decision path — see `docs/INTEGRATIONS.md`.
 - `collateralFactorBps = 7000` (70%)
 - `riskAdjustmentBps = 8000` (80%)
 - `Registry.positionWriter` = `LedgerLineLendingAdapter`
-- `LedgerLineLendingAdapter.isAuthorizedReleaser[VaultAdapter] = true`
+- `LedgerLineLendingAdapter.isAuthorizedReleaser[VaultAdapter] = true` (now the debt-safe `0xfF7E…5A6b`; see above)
 
 ## Stylus engines (PositionEngine / RiskEngine)
 

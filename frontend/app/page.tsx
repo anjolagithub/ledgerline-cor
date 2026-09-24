@@ -68,7 +68,6 @@ const consumers = [
     text: "CortexRails evaluates lifecycle conditions before collateral leaves the vault. The adapter then applies debt safety: remaining capacity must still cover outstanding debt.",
     policy: "Lifecycle must be ACTIVE · permitted up to the full position",
     adapter: "Adapter blocks a withdrawal that would under-collateralize debt",
-    note: "The testnet instance predates the debt-safety check. The fixed build is implemented and tested; its redeploy is pending.",
   },
   {
     action: "TRANSFER",
@@ -100,7 +99,7 @@ const deployed = [
   { name: "PositionEngine", role: "Stylus (Rust/WASM)", address: "0xde8365dAF3CFdF952E2F946F19a4DcAcd57eFf0F" },
   { name: "RiskEngine", role: "Stylus (Rust/WASM)", address: "0xf661dA9D3f214A181014Bc7ba8590B90F9314eC4" },
   { name: "LedgerLineLendingAdapter", role: "BORROW consumer", address: "0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97" },
-  { name: "LedgerLineVaultAdapter", role: "WITHDRAW consumer · pre-debt-check build", address: "0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67" },
+  { name: "LedgerLineVaultAdapter", role: "WITHDRAW consumer", address: "0xfF7EC5218730AdbCAa14cdf205cc57F97D335A6b" },
   { name: "LedgerLineTransferAdapter", role: "TRANSFER consumer", address: "0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943" },
   { name: "RobinhoodStockTokenAdapter", role: "Asset adapter · not wired into Registry", address: "0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9" },
   { name: "TSLA Stock Token", role: "Collateral · 18 decimals", address: "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E" },
@@ -228,7 +227,6 @@ export default function Landing() {
                 <div><dt>Adapter</dt><dd>{c.adapter}</dd></div>
               </dl>
               <p className="font-mono text-[10px] text-terminal-muted">{c.contract}</p>
-              {c.note && <p className="border-t border-terminal-border pt-3 text-xs leading-5 text-decision-limit">{c.note}</p>}
             </article>
           ))}
         </div>
@@ -308,7 +306,7 @@ export default function Landing() {
               ))}
             </tbody>
           </table>
-          <p className="mt-4 max-w-3xl text-xs leading-6 text-terminal-muted">The live WITHDRAW consumer is the VaultAdapter build that predates the debt-safety check. The debt-safe build is in the repository with passing tests; its testnet redeploy has not landed on chain yet. Full history and block numbers are in <a href={`${REPO}/blob/master/docs/DEPLOYMENTS.md`} target="_blank" rel="noreferrer" className="text-terminal-text underline underline-offset-4">DEPLOYMENTS.md</a>.</p>
+          <p className="mt-4 max-w-3xl text-xs leading-6 text-terminal-muted">Every address above has live bytecode on Robinhood Chain testnet. Block numbers, deploy transactions, and the VaultAdapter redeploy history are in <a href={`${REPO}/blob/master/docs/DEPLOYMENTS.md`} target="_blank" rel="noreferrer" className="text-terminal-text underline underline-offset-4">DEPLOYMENTS.md</a>.</p>
         </div>
       </section>
 

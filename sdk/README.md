@@ -43,12 +43,5 @@ const retry = suggestRetryIntent(intent, result); // only defined when decision 
 Supported agent actions: `BORROW`, `WITHDRAW`, `TRANSFER`. Supported
 asset: `TSLA` (the one asset this deployment configures).
 
-## Known issue
-
-`ROBINHOOD_TESTNET_ADDRESSES.vaultAdapter` points at an address with no
-deployed code (see `docs/DEPLOYMENTS.md`). Reads and the other write
-methods are unaffected. Don't rely on `withdraw()` until the debt-safe
-VaultAdapter is actually deployed and this address is updated.
-
 See `src/client.ts` for the full read/write surface and its documented
 amount and confirmation conventions.

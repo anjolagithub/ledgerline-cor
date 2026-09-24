@@ -106,11 +106,10 @@ updated before the external `safeTransfer` call.
    storage-layout change, and none of these contracts are upgradeable
    by design (see `docs/DEPLOYMENTS.md`). The same is true of the
    pre-fix `RobinhoodStockTokenAdapter` instance
-   (`0x9aE01a29Ec6774CAb63C6491F8f7D6b3866D1c2f`, superseded below), but
-   **not** of the pre-fix `LedgerLineVaultAdapter` instance
-   (`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`): its intended
-   replacement never deployed, so it is still the live, authorized
-   WITHDRAW consumer (see "Fixed since" below).
+   (`0x9aE01a29Ec6774CAb63C6491F8f7D6b3866D1c2f`, superseded below), and
+   of the pre-fix `LedgerLineVaultAdapter` instance
+   (`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`, superseded below; its
+   releaser authorization on `LendingAdapter` has been revoked).
 5. **No upgradeability anywhere in the stack** (matches the project's
    own "avoid unnecessary upgradeability" rule) — there is no proxy
    pattern and no post-deployment swap path for any immutable contract
@@ -145,16 +144,15 @@ debt — which now reverts if a withdrawal would leave outstanding
 `LendingAdapter` debt uncollateralized
 (`test_withdrawBlockedIfWouldUnderCollateralizeDebt`,
 `test_withdrawAllowedIfDebtStillCovered`). Because this changes
-`VaultAdapter`'s bytecode, it needs a redeploy. **That redeploy never
-reached chain.** `contracts/script/RedeployVaultAdapter.s.sol`'s
-recorded address (`0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac`) has no
-bytecode, even though it was authorized as a releaser. The live,
-authorized WITHDRAW consumer is still the pre-fix instance
-(`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`), so **on testnet, a
-borrower can still withdraw collateral out from under their debt**
-until the fixed build is actually deployed and the pre-fix instance's
-releaser authorization is revoked (see `docs/DEPLOYMENTS.md`). The fix
-is real and tested in this repo; it is just not live. This does not change limitation 1 above
+`VaultAdapter`'s bytecode, it needed a redeploy. The first attempt
+silently failed: its script bundled an `onlyOwner` authorization run
+with a non-owner key, so forge broadcast nothing, and a codeless address
+(`0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac`) ended up authorized as a
+releaser while the pre-fix instance stayed live. As of 2026-09-24 the
+debt-safe instance is deployed at
+`0xfF7EC5218730AdbCAa14cdf205cc57F97D335A6b` and authorized, and both
+the pre-fix instance and the codeless address have had their releaser
+authorization revoked. The txs are in `docs/DEPLOYMENTS.md`. This does not change limitation 1 above
 (`Policy.canExecute` for BORROW only sees the newly-requested amount) —
 that remains a separate, unfixed gap.
 

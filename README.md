@@ -99,7 +99,7 @@ independent consumer contracts:
 | Action | Consumer | What `canExecute()` checks | What the adapter adds |
 |---|---|---|---|
 | **BORROW** | `LedgerLineLendingAdapter` | Lifecycle `ACTIVE`; request vs. capacity = position value × collateral factor × risk adjustment | Existing debt + request ≤ `permittedAmount` (Policy is debt-agnostic) |
-| **WITHDRAW** | `LedgerLineVaultAdapter` | Lifecycle `ACTIVE`; permitted up to the full position | Remaining capacity must still cover outstanding debt (see the [deployment caveat](#security--limitations)) |
+| **WITHDRAW** | `LedgerLineVaultAdapter` | Lifecycle `ACTIVE`; permitted up to the full position | Remaining capacity must still cover outstanding debt |
 | **TRANSFER** | `LedgerLineTransferAdapter` | Lifecycle `ACTIVE`; permitted up to the full position | Any outstanding debt blocks the transfer outright. No tokens move; Registry ownership is reassigned in custody |
 
 Adding WITHDRAW and then TRANSFER needed **zero changes** to
@@ -190,17 +190,9 @@ matter most:
   TSLA data, but it is not wired into the live decision path, and no
   Chainlink tokenized-equity feed exists for Robinhood Chain testnet
   (details in [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)).
-- **The debt-safe VaultAdapter is not live on testnet.** The
-  debt-safety check in `LedgerLineVaultAdapter.withdraw()` is
-  implemented and tested, but its redeploy never landed on chain. The
-  address previously recorded for it
-  (`0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac`) has no bytecode. The
-  live, authorized WITHDRAW consumer is still the pre-fix instance
-  (`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`), which does not check
-  debt. See [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md).
 - **No `repay()`.** Debt is permanent once borrowed, so a position that
-  has borrowed can never pass TransferAdapter's (or the fixed
-  VaultAdapter's) debt check again.
+  has borrowed can never pass TransferAdapter's debt check again, and
+  VaultAdapter only lets it withdraw down to what still covers the debt.
 - **Policy is debt-agnostic.** For BORROW, `canExecute()` compares only
   the new request to capacity. Consumers must add existing debt
   themselves, as `LedgerLineLendingAdapter` does.
@@ -256,7 +248,7 @@ chain state. Block numbers and deploy transactions are in
 | `PositionEngine` (Stylus) | Position value | [`0xde8365dAF3CFdF952E2F946F19a4DcAcd57eFf0F`](https://explorer.testnet.chain.robinhood.com/address/0xde8365dAF3CFdF952E2F946F19a4DcAcd57eFf0F) |
 | `RiskEngine` (Stylus) | Borrowing capacity | [`0xf661dA9D3f214A181014Bc7ba8590B90F9314eC4`](https://explorer.testnet.chain.robinhood.com/address/0xf661dA9D3f214A181014Bc7ba8590B90F9314eC4) |
 | `LedgerLineLendingAdapter` | BORROW consumer, custody | [`0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97`](https://explorer.testnet.chain.robinhood.com/address/0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97) |
-| `LedgerLineVaultAdapter` | WITHDRAW consumer (pre-debt-check build) | [`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`](https://explorer.testnet.chain.robinhood.com/address/0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67) |
+| `LedgerLineVaultAdapter` | WITHDRAW consumer (debt-safe) | [`0xfF7EC5218730AdbCAa14cdf205cc57F97D335A6b`](https://explorer.testnet.chain.robinhood.com/address/0xfF7EC5218730AdbCAa14cdf205cc57F97D335A6b) |
 | `LedgerLineTransferAdapter` | TRANSFER consumer | [`0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943`](https://explorer.testnet.chain.robinhood.com/address/0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943) |
 | `RobinhoodStockTokenAdapter` | Asset adapter (not wired into Registry) | [`0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9`](https://explorer.testnet.chain.robinhood.com/address/0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9) |
 | TSLA Stock Token | Collateral, 18 decimals | [`0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E`](https://explorer.testnet.chain.robinhood.com/address/0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E) |
@@ -308,10 +300,12 @@ tokens, and each is now regression-tested:
   and covered by fuzz testing.
 - **A `forge script --broadcast` run whose later call reverts
   broadcasts nothing.** The VaultAdapter redeploy script's
-  `setAuthorizedReleaser` call reverted in simulation (wrong key), so
-  the deploy never reached chain. Only the simulated address was
-  printed, and it was later authorized by hand. See the security
-  section above.
+  `setAuthorizedReleaser` call reverted in simulation (non-owner key),
+  so the deploy never reached chain. Only the simulated address was
+  printed, and it was later authorized by hand. Fixed by making the
+  script deploy-only, deploying for real, authorizing the new instance,
+  and revoking both the pre-fix and codeless authorizations, each step
+  verified on chain (txs in `docs/DEPLOYMENTS.md`).
 
 ## Repo layout
 
@@ -332,8 +326,6 @@ tokens, and each is now regression-tested:
 
 Natural next additions, given the current, disclosed scope boundaries:
 
-- Complete the debt-safe `LedgerLineVaultAdapter` redeploy on testnet
-  and revoke the pre-fix instance's releaser authorization.
 - A `repay()` function on `LedgerLineLendingAdapter`. Debt is currently
   permanent once borrowed.
 - A fourth consumer action, for example `Action.LIQUIDATE`, already

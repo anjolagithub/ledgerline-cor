@@ -79,11 +79,17 @@ lifecycle state (`ACTIVE`), not borrowing capacity, per
 `docs/POLICY.md` — and on `ALLOW` calls
 `LendingAdapter.releaseCollateral()` to transfer TSLA back to the
 wallet and update the shared Registry position. The `Withdrawn` event
-appears in the Activity log. Note: this recorded withdrawal went to the
-live pre-fix VaultAdapter (`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`),
-which does not check outstanding USDG debt. The debt-safe build is in
-the repo and tested, but its testnet redeploy never landed on chain (see
-`docs/DEPLOYMENTS.md` and `docs/SECURITY.md`).
+appears in the Activity log.
+
+The live VaultAdapter is now the debt-safe instance
+(`0xfF7EC5218730AdbCAa14cdf205cc57F97D335A6b`). It also reverts with
+`WouldUnderCollateralizeDebt` if the withdrawal would leave outstanding
+USDG debt uncovered by the remaining position's capacity. **Historical
+note:** the hash below was recorded earlier against the pre-fix instance
+(`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`, now de-authorized),
+which did not check debt. No withdrawal through the debt-safe instance
+has been recorded here yet. Its deploy and authorization txs are in
+`docs/DEPLOYMENTS.md`.
 
 - Explorer: `https://explorer.testnet.chain.robinhood.com/tx/0xfbb0095b7dcf6a17c9f324879bf082a04c36db53e24d9e8b0fc33080f4c0bdf3`
 
