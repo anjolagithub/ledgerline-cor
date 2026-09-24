@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { parseUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 import { ASSET_ID, ONE, REGISTRY, LENDING_ADAPTER } from "@/lib/contracts";
 import { evaluateAgentIntent, suggestRetryIntent, type AgentIntent, type AgentPolicyResult } from "@/lib/agentIntent";
@@ -42,6 +42,17 @@ export function AgentDemo() {
     args: [ASSET_ID, positionId],
     query: { enabled: !!address },
   }) as { data: { rawBalance: bigint } | undefined };
+
+  // Policy.canExecute() is debt-agnostic for BORROW; LendingAdapter.borrow()
+  // separately enforces existing debt + amount <= permittedAmount. Read the
+  // real debt so an ALLOW here is never presented as a guaranteed execution.
+  const { data: debt } = useReadContract({
+    address: LENDING_ADAPTER.address,
+    abi: LENDING_ADAPTER.abi,
+    functionName: "debt",
+    args: [address ?? ZERO_ADDRESS],
+    query: { enabled: !!address },
+  }) as { data: bigint | undefined };
 
   const positionValue = position && state ? (position.rawBalance * state.price) / ONE : undefined;
   const capacity =
@@ -205,6 +216,12 @@ export function AgentDemo() {
               >
                 Execute Borrow
               </button>
+            )}
+            {debt !== undefined && debt > 0n && result && debt + parseUnits(amount, 18) > result.raw.permittedAmount && (
+              <p className="mt-2 text-xs text-decision-limit">
+                This wallet already owes ${formatUnits(debt, 18)} USDG. LendingAdapter enforces existing debt + request ≤
+                permitted amount, so this borrow will revert with ExceedsPermittedAmount.
+              </p>
             )}
             <TransactionStatus status={tx.status} hash={tx.hash} message={tx.message} />
           </div>

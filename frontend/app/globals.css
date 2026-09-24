@@ -29,7 +29,7 @@ body {
 .font-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .eyebrow { color: var(--color-terminal-accent); font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .16em; line-height: 1.5; text-transform: uppercase; }
 .grid-bg { background-image: linear-gradient(rgba(145,165,189,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(145,165,189,.055) 1px, transparent 1px); background-size: 32px 32px; }
-.hero-grid { background-image: linear-gradient(rgba(145,165,189,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(145,165,189,.045) 1px, transparent 1px); background-size: 40px 40px; mask-image: linear-gradient(to bottom, black 0%, rgba(0,0,0,.82) 62%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 0%, rgba(0,0,0,.82) 62%, transparent 100%); }
+.hero-grid { background-image: linear-gradient(rgba(145,165,189,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(145,165,189,.045) 1px, transparent 1px); background-size: 40px 40px; mask-image: linear-gradient(to bottom, black 0%, black 78%, rgba(0,0,0,.5) 100%); -webkit-mask-image: linear-gradient(to bottom, black 0%, black 78%, rgba(0,0,0,.5) 100%); }
 .hero-grid > div:last-child { filter: drop-shadow(0 24px 48px rgba(0,0,0,.22)); }
 .demo-index { color: color-mix(in srgb, var(--color-terminal-muted) 80%, var(--color-terminal-accent)); }
 .glass-nav { position: sticky; isolation: isolate; border: 1px solid rgba(145,165,189,.18); background: linear-gradient(115deg, rgba(17,36,59,.78), rgba(7,17,31,.58) 55%, rgba(255,112,88,.06)); box-shadow: 0 16px 40px rgba(0,0,0,.22), inset 0 1px 0 rgba(238,245,255,.08), inset 0 -1px 0 rgba(145,165,189,.06); backdrop-filter: blur(22px) saturate(135%); -webkit-backdrop-filter: blur(22px) saturate(135%); }
@@ -123,3 +123,66 @@ summary:focus-visible, a:focus-visible, button:focus-visible, input:focus-visibl
 }
 :focus-visible { outline: 2px solid var(--color-terminal-accent); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+
+/* Landing: hero intent flow */
+.intent-flow { position: relative; display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: flow; }
+.intent-flow li { position: relative; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--color-terminal-border); border-radius: .75rem; background: rgba(13,27,46,.6); padding: 14px 18px; }
+.intent-flow li + li::before { position: absolute; top: -11px; left: 26px; width: 1px; height: 10px; background: var(--color-terminal-accent); content: ""; }
+.intent-flow-core { border-color: rgba(255,112,88,.5) !important; background: var(--color-terminal-surface2) !important; box-shadow: 0 0 0 1px rgba(255,112,88,.08), 0 18px 40px rgba(0,0,0,.18); }
+.intent-flow-label { font-size: .95rem; font-weight: 600; }
+.intent-flow-core .intent-flow-label { color: var(--color-terminal-accent); }
+.intent-flow-detail { color: var(--color-terminal-muted); font-family: var(--font-mono); font-size: .68rem; }
+
+/* Landing: 4-node flow variant */
+@media (min-width: 1024px) { .architecture-flow-4 { grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; align-items: stretch; } .architecture-flow-4 .flow-node { min-height: 150px; padding: 18px; justify-content: flex-start; } }
+@media (min-width: 768px) and (max-width: 1023px) { .architecture-flow-4 { grid-template-columns: 1fr; } .architecture-flow-4 .flow-arrow { transform: rotate(90deg); } }
+
+/* Landing: consumers */
+.consumer-grid { display: grid; gap: 16px; }
+@media (min-width: 900px) { .consumer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.consumer-card { display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--color-terminal-border); border-radius: 1rem; background: linear-gradient(160deg, rgba(17,36,59,.7), rgba(7,17,31,.3)); padding: 22px; }
+.consumer-checks { display: grid; gap: 10px; margin-top: auto; border-top: 1px solid var(--color-terminal-border); padding-top: 14px; }
+.consumer-checks div { display: grid; grid-template-columns: 4.5rem 1fr; gap: 8px; font-size: .75rem; line-height: 1.5; }
+.consumer-checks dt { color: var(--color-terminal-accent); font-family: var(--font-mono); font-size: .6rem; letter-spacing: .12em; text-transform: uppercase; padding-top: 2px; }
+.consumer-checks dd { color: var(--color-terminal-text); }
+
+/* Landing: decisions, inputs */
+.decision-grid { display: grid; gap: 1px; border: 1px solid var(--color-terminal-border); background: var(--color-terminal-border); }
+@media (min-width: 640px) { .decision-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.decision-grid > div { display: flex; flex-direction: column; gap: 8px; background: var(--color-terminal-bg); padding: 20px; }
+.decision-grid p { color: var(--color-terminal-muted); font-size: .85rem; line-height: 1.6; }
+.input-list { display: grid; border-top: 1px solid var(--color-terminal-border); }
+.input-list > div { display: grid; gap: 6px; border-bottom: 1px solid var(--color-terminal-border); padding: 14px 0; }
+@media (min-width: 640px) { .input-list > div { grid-template-columns: 8rem 1fr; gap: 16px; } }
+.input-list dt { font-family: var(--font-mono); font-size: .8rem; }
+.input-list dd { color: var(--color-terminal-muted); font-size: .85rem; line-height: 1.6; }
+
+/* Landing: agent example */
+.agent-exchange { display: grid; gap: 10px; }
+.agent-turn { display: flex; flex-direction: column; gap: 6px; border-left: 2px solid var(--color-terminal-border); padding: 6px 0 6px 18px; }
+.agent-turn p { font-size: .95rem; }
+.agent-turn-policy { border: 1px solid var(--color-terminal-border); border-left: 2px solid var(--color-terminal-accent); border-radius: 0 .75rem .75rem 0; background: rgba(13,27,46,.6); padding: 16px 18px; }
+.agent-role { color: var(--color-terminal-muted); font-family: var(--font-mono); font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; }
+.agent-result { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 6px; }
+.agent-result dt { color: var(--color-terminal-muted); font-family: var(--font-mono); font-size: .58rem; letter-spacing: .1em; text-transform: uppercase; }
+.agent-result dd { font-family: var(--font-mono); font-size: .8rem; overflow-wrap: anywhere; }
+
+/* Landing: deployment */
+.status-block { display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--color-terminal-border); border-radius: 1rem; padding: 18px; }
+.status-block ul { display: grid; gap: 7px; color: var(--color-terminal-muted); font-size: .8rem; line-height: 1.45; }
+.address-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: .78rem; }
+.address-table th { border-bottom: 1px solid var(--color-terminal-border); padding: 10px 12px 10px 0; color: var(--color-terminal-accent); font-family: var(--font-mono); font-size: .6rem; font-weight: 600; letter-spacing: .14em; text-align: left; text-transform: uppercase; }
+.address-table td { border-bottom: 1px solid var(--color-terminal-border); padding: 11px 12px 11px 0; color: var(--color-terminal-muted); }
+
+/* Landing: architecture stack */
+.stack-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.stack-list li { display: grid; grid-template-columns: 2rem 1fr; align-items: baseline; gap: 4px 12px; border: 1px solid var(--color-terminal-border); padding: 14px 18px; }
+@media (min-width: 640px) { .stack-list li { grid-template-columns: 2rem 12rem 1fr; } }
+.stack-list strong { font-size: .95rem; font-weight: 600; }
+.stack-list small { grid-column: 2 / -1; color: var(--color-terminal-muted); font-family: var(--font-mono); font-size: .7rem; }
+@media (min-width: 640px) { .stack-list small { grid-column: auto; } }
+.stack-core { border-color: rgba(255,112,88,.45) !important; background: var(--color-terminal-surface2); }
+.stack-core strong { color: var(--color-terminal-accent); }
+.eyebrow.status-real { color: var(--color-decision-allow); }
+.eyebrow.status-config { color: var(--color-decision-limit); }
+.eyebrow.status-none { color: var(--color-terminal-muted); }

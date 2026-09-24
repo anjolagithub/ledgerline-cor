@@ -1,42 +1,105 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-const STATES = {
-  ACTIVE: { label: "TSLA Stock Token", risk: 80, state: "ACTIVE" },
-  RESTRICTED: { label: "TSLA Split", risk: 0, state: "RESTRICTED" },
-  RISK_DELTA: { label: "Volatility Spike", risk: 50, state: "RISK_DELTA" },
+/// Local, in-browser mirror of LedgerLinePolicy.canExecute()'s BORROW
+/// branch -- no chain call. Rules and reason strings are copied from
+/// contracts/src/LedgerLinePolicy.sol / LedgerLineTypes.sol:
+///   lifecycle != ACTIVE      -> BLOCK, permittedAmount 0, reason = state
+///   capacity == 0            -> BLOCK, permittedAmount 0, "NO_CAPACITY"
+///   amount <= capacity       -> ALLOW, permittedAmount = capacity, "OK"
+///   otherwise                -> LIMIT, permittedAmount = capacity, "EXCEEDS_CAPACITY"
+/// permittedAmount is always the maximum, never the request echoed back.
+const LIFECYCLES = ["ACTIVE", "RESTRICTED", "CORPORATE_ACTION", "SUSPENDED", "MATURING", "REDEEMABLE", "REDEEMED"] as const;
+type Lifecycle = (typeof LIFECYCLES)[number];
+
+// Illustrative position; 70% / 80% match the live testnet Registry config.
+const POSITION_VALUE = 200_000;
+const COLLATERAL_FACTOR_BPS = 7_000;
+const RISK_OPTIONS = [
+  { bps: 8_000, label: "80% (testnet config)" },
+  { bps: 5_000, label: "50% (operator update)" },
+  { bps: 0, label: "0% (operator update)" },
+];
+
+const TONE = {
+  ALLOW: "text-decision-allow",
+  LIMIT: "text-decision-limit",
+  BLOCK: "text-decision-block",
 } as const;
 
-type AssetState = keyof typeof STATES;
-
 export function LandingPolicyDemo() {
-  const [assetState, setAssetState] = useState<AssetState>("ACTIVE");
-  const [amount, setAmount] = useState("100000");
+  const [lifecycle, setLifecycle] = useState<Lifecycle>("ACTIVE");
+  const [riskBps, setRiskBps] = useState(8_000);
+  const [amount, setAmount] = useState("120000");
   const requested = Number(amount) || 0;
-  const config = STATES[assetState];
-  const capacity = Math.floor((200_000 * 0.7 * config.risk) / 100);
-  const decision = assetState === "RESTRICTED" ? "BLOCK" : requested <= capacity ? "ALLOW" : "LIMIT";
-  const tone = decision === "ALLOW" ? "allow" : decision === "LIMIT" ? "limit" : "block";
-  const toneClass = decision === "ALLOW" ? "text-decision-allow" : decision === "LIMIT" ? "text-decision-limit" : "text-decision-block";
-  const reason = decision === "ALLOW" ? "0x00_SUCCESS" : decision === "LIMIT" ? `0x4C_EXCEEDS_CAPACITY_MAX_${capacity}` : "0x43_ASSET_STATE_RESTRICTED";
-  const timestamp = useMemo(() => "13:41:38", [assetState, amount]);
+  const capacity = Math.floor((POSITION_VALUE * COLLATERAL_FACTOR_BPS * riskBps) / 100_000_000);
+
+  let decision: keyof typeof TONE;
+  let permitted: number;
+  let reason: string;
+  if (lifecycle !== "ACTIVE") {
+    [decision, permitted, reason] = ["BLOCK", 0, lifecycle];
+  } else if (capacity === 0) {
+    [decision, permitted, reason] = ["BLOCK", 0, "NO_CAPACITY"];
+  } else if (requested <= capacity) {
+    [decision, permitted, reason] = ["ALLOW", capacity, "OK"];
+  } else {
+    [decision, permitted, reason] = ["LIMIT", capacity, "EXCEEDS_CAPACITY"];
+  }
+  const toneClass = TONE[decision];
 
   return (
     <div className="policy-demo border border-terminal-border bg-terminal-surface p-5 md:p-7">
-      <div className="mb-6 flex items-center justify-between border-b border-terminal-border pb-4">
-        <div className="flex items-center gap-3"><span className="size-2 rounded-full bg-decision-allow" /><span className="font-mono text-[10px] uppercase tracking-[.14em] text-terminal-muted">Policy evaluation</span></div>
-        <span className="font-mono text-[10px] text-terminal-muted">LIVE / SIMULATION</span>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2 border-b border-terminal-border pb-4">
+        <span className="font-mono text-[10px] uppercase tracking-[.14em] text-terminal-muted">Policy simulation · Action.BORROW</span>
+        <span className="font-mono text-[10px] text-terminal-muted">Runs in your browser · no chain call</span>
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_1.05fr]">
-        <section className="flex flex-col gap-5" aria-label="Policy evaluation configuration">
-          <div><label htmlFor="asset-state" className="eyebrow">Asset state</label><select id="asset-state" value={assetState} onChange={(event) => setAssetState(event.target.value as AssetState)} className="mt-2 w-full border border-terminal-border bg-terminal-bg px-3 py-3 font-mono text-xs text-terminal-text focus:outline-none"><option value="ACTIVE">TSLA Stock Token (ACTIVE)</option><option value="RESTRICTED">TSLA Split (RESTRICTED)</option><option value="RISK_DELTA">Volatility Spike (RISK_DELTA)</option></select></div>
-          <div className="border border-terminal-border bg-terminal-bg p-4"><div className="mb-4 flex items-center justify-between"><span className="eyebrow">Capacity model</span><span className="font-mono text-[10px] text-terminal-muted">USDG</span></div><div className="grid gap-3 font-mono text-xs"><div className="flex justify-between"><span className="text-terminal-muted">Position value</span><span>$200,000</span></div><div className="flex justify-between"><span className="text-terminal-muted">Collateral factor</span><span>70%</span></div><div className="flex justify-between"><span className="text-terminal-muted">Risk adjustment</span><span>{config.risk}%</span></div><div className="mt-2 flex justify-between border-t border-terminal-border pt-3"><span className="text-terminal-muted">Effective capacity</span><strong className={assetState === "RESTRICTED" ? "text-terminal-muted" : "text-terminal-accent"}>{assetState === "RESTRICTED" ? "—" : `$${capacity.toLocaleString()}`}</strong></div></div></div>
-          <div><label htmlFor="landing-demo-amount" className="eyebrow">Requested borrow amount</label><div className="mt-2 flex items-center border border-terminal-border bg-terminal-bg"><span className="pl-3 text-terminal-muted">$</span><input id="landing-demo-amount" type="number" min="0" value={amount} onChange={(event) => setAmount(event.target.value)} className="w-full bg-transparent px-2 py-3 font-mono text-sm focus:outline-none" /></div></div>
+        <section className="flex flex-col gap-5" aria-label="Policy simulation inputs">
+          <div>
+            <label htmlFor="sim-lifecycle" className="eyebrow">Asset lifecycle</label>
+            <select id="sim-lifecycle" value={lifecycle} onChange={(e) => setLifecycle(e.target.value as Lifecycle)} className="mt-2 w-full border border-terminal-border bg-terminal-bg px-3 py-3 font-mono text-xs text-terminal-text focus:outline-none">
+              {LIFECYCLES.map((state) => <option key={state} value={state}>{state}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="sim-risk" className="eyebrow">Risk adjustment</label>
+            <select id="sim-risk" value={riskBps} onChange={(e) => setRiskBps(Number(e.target.value))} className="mt-2 w-full border border-terminal-border bg-terminal-bg px-3 py-3 font-mono text-xs text-terminal-text focus:outline-none">
+              {RISK_OPTIONS.map((option) => <option key={option.bps} value={option.bps}>{option.label}</option>)}
+            </select>
+          </div>
+          <div className="border border-terminal-border bg-terminal-bg p-4">
+            <div className="grid gap-3 font-mono text-xs">
+              <div className="flex justify-between"><span className="text-terminal-muted">Position value</span><span>${POSITION_VALUE.toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-terminal-muted">× Collateral factor</span><span>70%</span></div>
+              <div className="flex justify-between"><span className="text-terminal-muted">× Risk adjustment</span><span>{riskBps / 100}%</span></div>
+              <div className="mt-1 flex justify-between border-t border-terminal-border pt-3"><span className="text-terminal-muted">Borrowing capacity</span><strong className="text-terminal-accent">${capacity.toLocaleString()}</strong></div>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="landing-demo-amount" className="eyebrow">Requested borrow (USDG)</label>
+            <div className="mt-2 flex items-center border border-terminal-border bg-terminal-bg"><span className="pl-3 text-terminal-muted">$</span><input id="landing-demo-amount" type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-transparent px-2 py-3 font-mono text-sm focus:outline-none" /></div>
+          </div>
         </section>
-        <section className={`terminal-panel border border-terminal-border bg-[#080b10] ${tone}`} aria-label="CortexRails node terminal"><div className="flex items-center gap-1.5 border-b border-terminal-border px-4 py-3"><span className="size-2 rounded-full bg-decision-block/60" /><span className="size-2 rounded-full bg-decision-limit/60" /><span className="size-2 rounded-full bg-decision-allow/60" /><span className="ml-2 font-mono text-[10px] text-terminal-muted">ledgerline-node-v1.0.sh</span></div><div className="flex min-h-[252px] flex-col justify-between gap-6 p-4 font-mono text-[10px] leading-6"><div className="text-terminal-muted"><div><span className="text-terminal-accent">{timestamp}</span> canExecute()</div><div>assetState: <span className="text-terminal-text">{config.state}</span></div><div>requested: <span className="text-terminal-text">${requested.toLocaleString()} USDG</span></div></div><div className="border-l-2 border-terminal-border pl-4"><div className={`mb-2 text-2xl font-bold ${toneClass}`}>{decision}</div><div className="text-terminal-muted">{"{"}</div><div className="pl-3 text-terminal-muted">decision: <span className={toneClass}>{decision}</span>,</div><div className="pl-3 text-terminal-muted">permittedAmount: <span className="text-terminal-text">{decision === "BLOCK" ? 0 : decision === "LIMIT" ? capacity : requested}</span>,</div><div className="pl-3 text-terminal-muted">reasonCode: <span className="text-terminal-text">{reason}</span></div><div className="text-terminal-muted">{"}"}</div></div></div></section>
+        <section className="flex flex-col justify-between gap-6 border border-terminal-border bg-terminal-bg p-5 font-mono text-xs leading-6" aria-label="Simulated PolicyResponse" aria-live="polite">
+          <div className="text-terminal-muted">
+            <div>canExecute(1, positionId, BORROW, {requested.toLocaleString()})</div>
+            <div>lifecycle: <span className="text-terminal-text">{lifecycle}</span></div>
+          </div>
+          <div className="border-l-2 border-terminal-border pl-4">
+            <div className={`mb-3 text-3xl font-bold tracking-tight ${toneClass}`}>{decision}</div>
+            <div className="text-terminal-muted">PolicyResponse {"{"}</div>
+            <div className="pl-3 text-terminal-muted">decision: <span className={toneClass}>{decision}</span></div>
+            <div className="pl-3 text-terminal-muted">permittedAmount: <span className="text-terminal-text">{permitted.toLocaleString()}</span></div>
+            <div className="pl-3 text-terminal-muted">reason: <span className="text-terminal-text">&quot;{reason}&quot;</span></div>
+            <div className="text-terminal-muted">{"}"}</div>
+          </div>
+        </section>
       </div>
-      <p className="mt-5 border-t border-terminal-border pt-4 text-[10px] leading-5 text-terminal-muted">A deterministic policy result before a financial action executes. No live transaction is being sent.</p>
+      <p className="mt-5 border-t border-terminal-border pt-4 text-[11px] leading-5 text-terminal-muted">
+        Same rules and reason codes as <code className="font-mono text-terminal-text">LedgerLinePolicy.canExecute()</code> for BORROW, applied to an illustrative $200,000 position. The policy engine at <code className="font-mono text-terminal-text">/app</code> reads the deployed contract live.
+      </p>
     </div>
   );
 }

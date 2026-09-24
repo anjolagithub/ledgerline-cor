@@ -1,51 +1,346 @@
 import Link from "next/link";
 import { LandingPolicyDemo } from "@/components/LandingPolicyDemo";
-import { DisabledGitHubLink } from "@/components/DisabledGitHubLink";
 
-const code = `(Decision decision, uint256 permittedAmount, bytes32 reason) =
-    ledgerLine.canExecute(assetId, positionId, Action.BORROW, amount);`;
+const REPO = "https://github.com/anjolagithub/ledgerline-cor";
+const EXPLORER = "https://explorer.testnet.chain.robinhood.com";
 
-const sdkCode = `import { LedgerLineClient, Action } from "@ledgerline/core";
+// Exact signature from contracts/src/interfaces/ILedgerLinePolicy.sol and
+// the PolicyResponse struct from LedgerLineTypes.sol.
+const canExecuteCode = `function canExecute(
+    uint256 assetId,
+    uint256 positionId,
+    Action  action,     // BORROW | WITHDRAW | TRANSFER | ...
+    uint256 amount      // 18-decimal internal units
+) external view returns (PolicyResponse memory);
 
-const client = new LedgerLineClient(); // defaults to live testnet deployment
-const positionId = LedgerLineClient.positionIdFromAddress(address);
-const borrowCheck = await client.canExecute(positionId, Action.BORROW, amount);
-const withdrawCheck = await client.canExecute(positionId, Action.WITHDRAW, amount);
-const transferCheck = await client.canExecute(positionId, Action.TRANSFER, amount);`;
+struct PolicyResponse {
+    Decision decision;        // ALLOW | LIMIT | REVIEW | BLOCK
+    uint256  permittedAmount; // the maximum permitted, never the request
+    bytes32  reason;          // "OK", "EXCEEDS_CAPACITY", "RESTRICTED", ...
+}`;
+
+// Abridged from LedgerLineLendingAdapter.borrow().
+const consumerCode = `PolicyResponse memory response =
+    policy.canExecute(assetId, positionId, Action.BORROW, amount);
+
+if (response.decision == Decision.BLOCK) revert PolicyBlocked(response.reason);
+
+uint256 wouldOweTotal = debt[msg.sender] + amount;
+if (wouldOweTotal > response.permittedAmount)
+    revert ExceedsPermittedAmount(wouldOweTotal, response.permittedAmount);`;
+
+// Real exports from sdk/src (agent.ts, client.ts).
+const sdkCode = `import { LedgerLineClient, evaluateAgentIntent, suggestRetryIntent } from "@ledgerline/core";
+
+const client = new LedgerLineClient({ rpcUrl }); // defaults to the testnet deployment
+
+const intent = {
+  asset: "TSLA",
+  positionId: agentWallet,   // address or raw positionId
+  action: "BORROW",          // "BORROW" | "WITHDRAW" | "TRANSFER"
+  amount: "120000",          // human units; the SDK scales to 18 decimals
+};
+
+const result = await evaluateAgentIntent(client, intent);
+// e.g. { decision: "LIMIT", permittedAmount: "112000", reason: "EXCEEDS_CAPACITY", raw, ... }
+
+const retry = suggestRetryIntent(intent, result); // amount = permittedAmount, only on LIMIT`;
+
+const heroFlow = [
+  { label: "Agent / Protocol", detail: "proposes an action" },
+  { label: "Intent", detail: "{ asset, positionId, action, amount }" },
+  { label: "CortexRails", detail: "canExecute() · onchain policy", core: true },
+  { label: "Decision", detail: "", decisions: true },
+  { label: "Execution", detail: "consuming adapter enforces, then moves value" },
+];
+
+const consumers = [
+  {
+    action: "BORROW",
+    contract: "LedgerLineLendingAdapter",
+    text: "CortexRails evaluates borrowing capacity and risk before a lending action executes: position value × collateral factor × risk adjustment, computed by the Stylus engines.",
+    policy: "Lifecycle must be ACTIVE · request compared to capacity",
+    adapter: "Adapter enforces existing debt + request ≤ permitted amount",
+  },
+  {
+    action: "WITHDRAW",
+    contract: "LedgerLineVaultAdapter",
+    text: "CortexRails evaluates lifecycle conditions before collateral leaves the vault. The adapter then applies debt safety: remaining capacity must still cover outstanding debt.",
+    policy: "Lifecycle must be ACTIVE · permitted up to the full position",
+    adapter: "Adapter blocks a withdrawal that would under-collateralize debt",
+    note: "The testnet instance predates the debt-safety check. The fixed build is implemented and tested; its redeploy is pending.",
+  },
+  {
+    action: "TRANSFER",
+    contract: "LedgerLineTransferAdapter",
+    text: "CortexRails evaluates lifecycle conditions before collateral changes owner. Ownership is reassigned in custody; no tokens move.",
+    policy: "Lifecycle must be ACTIVE · permitted up to the full position",
+    adapter: "Adapter blocks the transfer while any debt is outstanding",
+  },
+];
 
 const decisions = [
-  ["ALLOW", "The action can execute.", "text-decision-allow"],
-  ["LIMIT", "The amount must be adjusted and resubmitted.", "text-decision-limit"],
-  ["REVIEW", "Additional conditions need attention.", "text-decision-review"],
-  ["BLOCK", "The action is prohibited by policy.", "text-decision-block"],
+  { name: "ALLOW", tone: "text-decision-allow", text: "The action satisfies policy." },
+  { name: "LIMIT", tone: "text-decision-limit", text: "The requested amount exceeds the permitted amount. The response carries the maximum permitted." },
+  { name: "REVIEW", tone: "text-decision-review", text: "Reserved in the Decision enum for a manual-review path. No policy branch returns it today." },
+  { name: "BLOCK", tone: "text-decision-block", text: "The action violates policy, for example a non-ACTIVE lifecycle or zero capacity." },
 ];
+
+const inputs = [
+  { name: "ASSET", text: "Price and multiplier from the Registry, the single state store." },
+  { name: "POSITION", text: "Raw collateral balance per (assetId, positionId)." },
+  { name: "RISK", text: "Collateral factor and risk adjustment, each bounded to ≤ 100%." },
+  { name: "LIFECYCLE", text: "ACTIVE · RESTRICTED · CORPORATE_ACTION · SUSPENDED · MATURING · REDEEMABLE · REDEEMED. Any state other than ACTIVE blocks every action with a state-specific reason." },
+  { name: "ACTION", text: "BORROW, WITHDRAW and TRANSFER have consumers. INCREASE_LEVERAGE and LIQUIDATE are reserved in the enum with no consumer yet." },
+];
+
+const deployed = [
+  { name: "LedgerLineRegistry", role: "State store", address: "0x88508A6d9266fbc928cC11DEE92f4EB1801B907c" },
+  { name: "LedgerLinePolicy", role: "canExecute()", address: "0x22fA5c1C36Cc1F7557B932dE7aCDa354ee4F6F52" },
+  { name: "PositionEngine", role: "Stylus (Rust/WASM)", address: "0xde8365dAF3CFdF952E2F946F19a4DcAcd57eFf0F" },
+  { name: "RiskEngine", role: "Stylus (Rust/WASM)", address: "0xf661dA9D3f214A181014Bc7ba8590B90F9314eC4" },
+  { name: "LedgerLineLendingAdapter", role: "BORROW consumer", address: "0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97" },
+  { name: "LedgerLineVaultAdapter", role: "WITHDRAW consumer · pre-debt-check build", address: "0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67" },
+  { name: "LedgerLineTransferAdapter", role: "TRANSFER consumer", address: "0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943" },
+  { name: "RobinhoodStockTokenAdapter", role: "Asset adapter · not wired into Registry", address: "0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9" },
+  { name: "TSLA Stock Token", role: "Collateral · 18 decimals", address: "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E" },
+  { name: "USDG", role: "Borrow asset · 6 decimals", address: "0x7E955252E15c84f5768B83c41a71F9eba181802F" },
+];
+
+const stack = [
+  ["Asset adapter", "RobinhoodStockTokenAdapter · deployed, not yet wired to Registry"],
+  ["Registry / state", "LedgerLineRegistry"],
+  ["Position engine", "Stylus · position value"],
+  ["Risk engine", "Stylus · borrowing capacity"],
+  ["Policy", "canExecute()"],
+  ["Financial adapter", "Lending · Vault · Transfer"],
+];
+
+const navLinks = [
+  ["#primitive", "Primitive"],
+  ["#consumers", "Consumers"],
+  ["#agents", "Agents"],
+  ["#deployment", "Deployment"],
+  ["#developer", "Developers"],
+];
+
+function short(address: string) {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function SectionHeading({ id, eyebrow, title, children }: { id?: string; eyebrow: string; title: string; children?: React.ReactNode }) {
+  return (
+    <div>
+      <p className="eyebrow">{eyebrow}</p>
+      <h2 id={id} className="mt-5 max-w-md text-3xl font-semibold tracking-tight md:text-4xl">{title}</h2>
+      {children && <div className="mt-5 max-w-sm space-y-4 text-sm leading-7 text-terminal-muted">{children}</div>}
+    </div>
+  );
+}
 
 export default function Landing() {
   return (
     <main className="site-shell mx-auto flex max-w-7xl flex-col px-4 sm:px-6 md:px-10">
       <nav className="glass-nav sticky top-3 z-50 mx-auto flex min-h-14 w-full items-center justify-between rounded-2xl px-3 py-2.5 sm:top-4 sm:min-h-16 sm:px-4 sm:py-3 md:px-5" aria-label="Primary navigation">
-        <Link href="/" className="flex min-w-0 items-center gap-3 font-semibold tracking-tight"><span className="brand-mark" aria-hidden="true"><span className="brand-mark-line brand-mark-line-a" /><span className="brand-mark-line brand-mark-line-b" /><span className="brand-mark-line brand-mark-line-c" /></span><span className="truncate text-[13px] sm:text-base">CortexRails</span><span className="hidden rounded-full border border-terminal-border/80 bg-terminal-bg/30 px-2.5 py-1 font-mono text-[9px] font-normal tracking-normal text-terminal-muted sm:inline"><span className="mr-1.5 text-terminal-accent">●</span>v1.0-testbed</span></Link>
-        <div className="flex items-center gap-2 text-xs text-terminal-muted md:gap-5"><div className="hidden items-center gap-5 lg:flex"><a href="#product" className="nav-link transition-colors hover:text-terminal-text">Core primitive</a><a href="#architecture" className="nav-link transition-colors hover:text-terminal-text">Architecture</a><a href="https://github.com/anjolagithub/ledgerline-cor/tree/master/docs" target="_blank" rel="noreferrer" className="nav-link transition-colors hover:text-terminal-text">Docs</a><a href="https://github.com/anjolagithub/ledgerline-cor/tree/master/sdk" target="_blank" rel="noreferrer" className="nav-link transition-colors hover:text-terminal-text">SDK</a><a href="https://github.com/anjolagithub/ledgerline-cor" target="_blank" rel="noreferrer" className="nav-link transition-colors hover:text-terminal-text">GitHub</a></div><details className="mobile-nav-menu"><summary className="glass-menu rounded-lg p-2 text-terminal-muted" aria-label="Toggle navigation"><span className="sr-only menu-label">Open navigation</span><span className="sr-only menu-close">Close navigation</span><span className="menu-icon" aria-hidden="true"><i /><i /><i /></span></summary><div className="mobile-nav-panel"><a href="#product">Core primitive</a><a href="#architecture">Architecture</a><a href="https://github.com/anjolagithub/ledgerline-cor/tree/master/docs" target="_blank" rel="noreferrer">Docs</a><a href="https://github.com/anjolagithub/ledgerline-cor/tree/master/sdk" target="_blank" rel="noreferrer">SDK</a><a href="https://github.com/anjolagithub/ledgerline-cor" target="_blank" rel="noreferrer">GitHub</a></div></details><span className="hidden rounded-full border border-terminal-border/70 bg-terminal-bg/25 px-2.5 py-1 font-mono text-[10px] text-terminal-muted xl:inline"><span className="mr-1.5 text-decision-allow">●</span>Robinhood Chain · Testnet</span><Link href="/app" className="glass-cta rounded-xl px-3.5 py-2.5 text-[10px] font-semibold uppercase tracking-[.12em] text-terminal-text transition-transform hover:-translate-y-0.5 hover:text-terminal-accent sm:px-4">Open Core <span aria-hidden="true">→</span></Link></div>
+        <Link href="/" className="flex min-w-0 items-center gap-3 font-semibold tracking-tight"><span className="brand-mark" aria-hidden="true"><span className="brand-mark-line brand-mark-line-a" /><span className="brand-mark-line brand-mark-line-b" /><span className="brand-mark-line brand-mark-line-c" /></span><span className="truncate text-[13px] sm:text-base">CortexRails</span><span className="hidden rounded-full border border-terminal-border/80 bg-terminal-bg/30 px-2.5 py-1 font-mono text-[9px] font-normal tracking-normal text-terminal-muted sm:inline"><span className="mr-1.5 text-terminal-accent">●</span>Protocol</span></Link>
+        <div className="flex items-center gap-2 text-xs text-terminal-muted md:gap-5">
+          <div className="hidden items-center gap-5 lg:flex">
+            {navLinks.map(([href, label]) => <a key={href} href={href} className="nav-link transition-colors hover:text-terminal-text">{label}</a>)}
+            <a href={REPO} target="_blank" rel="noreferrer" className="nav-link transition-colors hover:text-terminal-text">GitHub</a>
+          </div>
+          <details className="mobile-nav-menu"><summary className="glass-menu rounded-lg p-2 text-terminal-muted" aria-label="Toggle navigation"><span className="sr-only menu-label">Open navigation</span><span className="sr-only menu-close">Close navigation</span><span className="menu-icon" aria-hidden="true"><i /><i /><i /></span></summary><div className="mobile-nav-panel">{navLinks.map(([href, label]) => <a key={href} href={href}>{label}</a>)}<a href={REPO} target="_blank" rel="noreferrer">GitHub</a></div></details>
+          <span className="hidden rounded-full border border-terminal-border/70 bg-terminal-bg/25 px-2.5 py-1 font-mono text-[10px] text-terminal-muted xl:inline"><span className="mr-1.5 text-decision-allow">●</span>Robinhood Chain · Testnet</span>
+          <Link href="/app" className="glass-cta rounded-xl px-3.5 py-2.5 text-[10px] font-semibold uppercase tracking-[.12em] text-terminal-text transition-transform hover:-translate-y-0.5 hover:text-terminal-accent sm:px-4">Policy engine <span aria-hidden="true">→</span></Link>
+        </div>
       </nav>
 
-      <section id="product" className="hero-grid relative grid scroll-mt-24 items-center gap-10 border-b border-terminal-border py-10 md:grid-cols-[.82fr_1.18fr] md:gap-12 md:py-16 lg:py-20">
-        <div className="flex flex-col gap-7"><div className="flex items-center gap-3"><span className="eyebrow">Policy infrastructure for autonomous finance</span><span className="h-px w-10 bg-terminal-accent" /></div><h1 className="max-w-2xl text-[3.2rem] font-semibold leading-[.94] tracking-[-.065em] sm:text-6xl md:text-7xl lg:text-[5.35rem]">The decision layer for <span className="text-terminal-accent">serious finance.</span></h1><p className="max-w-lg text-lg leading-8 text-terminal-muted">CortexRails checks the asset, its current state, the position and the requested action — then returns a clear decision before value moves.</p><div className="flex flex-wrap gap-3"><Link href="/app" className="primary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] text-terminal-accent-fg transition-transform hover:-translate-y-0.5">Explore Core <span aria-hidden="true">→</span></Link><a href="#architecture" className="secondary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] transition-colors hover:bg-terminal-surface">See the model</a></div><div className="flex items-center gap-3 pt-1 font-mono text-[10px] text-terminal-muted"><span className="size-1.5 rounded-full bg-decision-allow" /> deterministic by design <span className="text-terminal-border">/</span> composable by default</div><div className="hero-proof-grid"><div><strong>4</strong><span>policy outcomes</span></div><div><strong>1</strong><span>decision surface</span></div><div><strong>0</strong><span>ambiguous states</span></div></div></div>
-        <div className="relative md:pt-4"><span className="demo-index absolute -top-7 right-0 font-mono text-[10px] tracking-[.16em] text-terminal-muted md:top-0">LIVE POLICY SIMULATION</span><LandingPolicyDemo /></div>
+      {/* Hero */}
+      <section id="product" className="hero-grid relative grid scroll-mt-24 items-center gap-12 border-b border-terminal-border py-12 md:grid-cols-[1.15fr_.85fr] md:py-20">
+        <div className="flex flex-col gap-7">
+          <div className="flex items-center gap-3"><span className="eyebrow">CortexRails Protocol</span><span className="h-px w-10 bg-terminal-accent" /></div>
+          <h1 className="max-w-3xl text-[2.7rem] font-semibold leading-[.98] tracking-[-.055em] sm:text-6xl lg:text-[4.6rem]">The policy layer between intent and <span className="text-terminal-accent">financial execution.</span></h1>
+          <p className="max-w-xl text-lg leading-8 text-terminal-muted">CortexRails gives financial protocols and autonomous agents a deterministic onchain policy layer for evaluating asset state, position risk, lifecycle conditions, and action-specific rules before value moves.</p>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/app" className="primary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] text-terminal-accent-fg transition-transform hover:-translate-y-0.5">Explore the policy engine <span aria-hidden="true" className="ml-1">→</span></Link>
+            <a href={REPO} target="_blank" rel="noreferrer" className="secondary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] transition-colors hover:bg-terminal-surface">View on GitHub</a>
+          </div>
+          <div className="hero-proof-grid"><div><strong>1</strong><span>policy surface</span></div><div><strong>3</strong><span>consumer adapters</span></div><div><strong>2</strong><span>Stylus engines</span></div></div>
+        </div>
+        <ol className="intent-flow" aria-label="How a request flows through CortexRails">
+          {heroFlow.map((step) => (
+            <li key={step.label} className={step.core ? "intent-flow-core" : undefined}>
+              <span className="intent-flow-label">{step.label}</span>
+              {step.decisions ? (
+                <span className="font-mono text-xs"><span className="text-decision-allow">ALLOW</span> / <span className="text-decision-limit">LIMIT</span> / <span className="text-decision-review">REVIEW</span> / <span className="text-decision-block">BLOCK</span></span>
+              ) : (
+                <span className="intent-flow-detail">{step.detail}</span>
+              )}
+            </li>
+          ))}
+        </ol>
       </section>
 
-      <section className="model-strip border-b border-terminal-border py-7 md:py-8"><div className="eyebrow mb-4">Every decision follows the same path</div><div className="flex flex-wrap items-center gap-x-4 gap-y-3 font-mono text-sm md:text-base"><span>ASSET</span><span className="text-terminal-accent">→</span><span>STATE</span><span className="text-terminal-accent">→</span><span>POSITION</span><span className="text-terminal-accent">→</span><span>RISK</span><span className="text-terminal-accent">→</span><span className="text-terminal-text">POLICY</span><span className="text-terminal-accent">→</span><span className="text-terminal-text">ACTION</span></div></section>
+      {/* Agents */}
+      <section id="agents" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.8fr_1.2fr] md:py-24" aria-labelledby="agents-title">
+        <SectionHeading id="agents-title" eyebrow="Autonomous agents" title="Agents propose. CortexRails decides.">
+          <p>Autonomous agents can determine what they want to do. Financial protocols still need a deterministic boundary that decides what they are actually allowed to do.</p>
+          <p>CortexRails evaluates the requested action against the current asset, position, lifecycle, and policy state before execution.</p>
+        </SectionHeading>
+        <div className="flex flex-col justify-center gap-6">
+          <div className="architecture-flow architecture-flow-4">
+            <div className="flow-node"><span className="eyebrow">01 · Offchain</span><strong>Agent intent</strong><small>Structured request: asset, position, action, amount</small></div>
+            <span className="flow-arrow">→</span>
+            <div className="flow-node flow-core"><span className="eyebrow">02 · Onchain read</span><strong>CortexRails policy evaluation</strong><small>Policy.canExecute()</small></div>
+            <span className="flow-arrow">→</span>
+            <div className="flow-node"><span className="eyebrow">03 · Result</span><strong className="font-mono text-sm"><span className="text-decision-allow">ALLOW</span> / <span className="text-decision-limit">LIMIT</span> / <span className="text-decision-block">BLOCK</span></strong><small>decision · permittedAmount · reason</small></div>
+            <span className="flow-arrow">→</span>
+            <div className="flow-node"><span className="eyebrow">04 · Onchain write</span><strong>Adapter execution</strong><small>The adapter re-checks policy in the same transaction</small></div>
+          </div>
+          <p className="max-w-2xl text-sm leading-7 text-terminal-muted">No model sits in the decision path. The agent layer only translates units and enum names, and the authoritative answer is the onchain <code className="font-mono text-terminal-text">canExecute()</code> result. Every adapter calls <code className="font-mono text-terminal-text">canExecute()</code> again at execution time, so a stale or skipped evaluation can&apos;t bypass policy.</p>
+        </div>
+      </section>
 
-      <section className="feature-section grid gap-8 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">The missing layer</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">A balance and a price are not the whole story.</h2></div><div className="grid gap-8 md:grid-cols-2"><p className="max-w-md text-base leading-8 text-terminal-muted">Tokenized assets introduce state. Lifecycle changes, restrictions, corporate actions and risk conditions can all change whether a financial action should execute.</p><div className="signal-card font-mono text-sm leading-9 text-terminal-muted"><div>BALANCE <span className="text-terminal-border">+</span> STATE</div><div>POSITION <span className="text-terminal-border">+</span> RISK</div><div className="text-terminal-text">POLICY <span className="text-terminal-border">→</span> ACTION</div></div></div></section>
+      {/* Primitive */}
+      <section id="primitive" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24">
+        <SectionHeading eyebrow="The policy primitive" title="One call before value moves.">
+          <p>Every consumer asks the same question through the same function. The same policy surface is called before different financial actions.</p>
+          <p><code className="font-mono text-terminal-text">canExecute()</code> is a <code className="font-mono text-terminal-text">view</code> function. It never moves funds or enforces anything itself; the calling contract does both.</p>
+        </SectionHeading>
+        <div className="grid min-w-0 gap-5">
+          <div className="min-w-0"><p className="eyebrow mb-3">ILedgerLinePolicy</p><pre className="code-card min-w-0 overflow-x-auto p-6 text-xs leading-6 text-terminal-muted"><code>{canExecuteCode}</code></pre></div>
+          <div className="min-w-0"><p className="eyebrow mb-3">A consumer enforcing it · LendingAdapter.borrow()</p><pre className="code-card min-w-0 overflow-x-auto p-6 text-xs leading-6 text-terminal-muted"><code>{consumerCode}</code></pre></div>
+        </div>
+      </section>
 
-      <section id="architecture" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">The primitive</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">One policy layer. Any asset environment.</h2><p className="mt-5 max-w-sm text-sm leading-7 text-terminal-muted">Asset-specific state stays at the edge. Financial policy stays consistent at the core.</p></div><div className="architecture-flow"><div className="flow-node"><span className="eyebrow">Input</span><strong>Asset environment</strong><small>Asset adapter</small></div><span className="flow-arrow">→</span><div className="flow-node flow-core"><span className="eyebrow">Decision engine</span><strong>CortexRails Core</strong><small>Position · Lifecycle · Risk · Policy</small></div><span className="flow-arrow">→</span><div className="flow-node"><span className="eyebrow">Output</span><strong>Financial action</strong><small>ALLOW · LIMIT · REVIEW · BLOCK</small></div></div></section>
+      {/* Consumers */}
+      <section id="consumers" className="feature-section scroll-mt-24 border-b border-terminal-border py-20 md:py-24">
+        <div className="grid gap-10 md:grid-cols-[.7fr_1.3fr]">
+          <SectionHeading eyebrow="Reuse" title="One policy surface. Multiple financial consumers." />
+          <p className="max-w-xl self-end text-sm leading-7 text-terminal-muted">Three independent adapter contracts call the same, unmodified Registry, Stylus engines, and Policy. Adding WITHDRAW and then TRANSFER needed no change to the Registry or either engine, just one new Policy branch each.</p>
+        </div>
+        <div className="consumer-grid mt-12">
+          {consumers.map((c) => (
+            <article key={c.action} className="consumer-card">
+              <div className="flex items-baseline justify-between gap-3"><h3 className="font-mono text-lg font-semibold tracking-tight">{c.action}</h3><span className="font-mono text-[10px] text-terminal-muted">Action.{c.action}</span></div>
+              <p className="text-sm leading-7 text-terminal-muted">{c.text}</p>
+              <dl className="consumer-checks">
+                <div><dt>Policy</dt><dd>{c.policy}</dd></div>
+                <div><dt>Adapter</dt><dd>{c.adapter}</dd></div>
+              </dl>
+              <p className="font-mono text-[10px] text-terminal-muted">{c.contract}</p>
+              {c.note && <p className="border-t border-terminal-border pt-3 text-xs leading-5 text-decision-limit">{c.note}</p>}
+            </article>
+          ))}
+        </div>
+      </section>
 
-      <section className="feature-section grid gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">State matters</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">When the asset changes, the policy changes with it.</h2></div><div className="state-story"><div><span className="eyebrow">Lifecycle</span><div className="mt-4 font-mono text-2xl">ACTIVE <span className="text-terminal-accent">→</span> RESTRICTED</div></div><div className="state-result"><span className="font-mono text-xs text-terminal-muted">BORROW REQUEST · $100,000</span><strong className="text-decision-block">BLOCK</strong><p>Asset state does not permit this action.</p></div></div></section>
+      {/* Decisions */}
+      <section id="decisions" className="feature-section scroll-mt-24 border-b border-terminal-border py-20 md:py-24">
+        <div className="grid gap-10 md:grid-cols-[.7fr_1.3fr]">
+          <SectionHeading eyebrow="Decision model" title="Deterministic decisions.">
+            <p>The same state and the same request always produce the same response. LIMIT returns the maximum permitted amount, and CortexRails never quietly reduces the request. The caller decides whether to resubmit.</p>
+          </SectionHeading>
+          <div className="decision-grid">
+            {decisions.map((d) => <div key={d.name}><span className={`font-mono text-xl font-semibold ${d.tone}`}>{d.name}</span><p>{d.text}</p></div>)}
+          </div>
+        </div>
+        <div className="mt-12"><LandingPolicyDemo /></div>
+      </section>
 
-      <section id="developer" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24"><div><p className="eyebrow">For developers</p><h2 className="mt-5 max-w-sm text-3xl font-semibold tracking-tight md:text-4xl">A decision protocol, not another dashboard.</h2></div><div className="grid min-w-0 gap-6 md:grid-cols-[1.2fr_.8fr]"><pre className="code-card min-w-0 overflow-x-auto p-6 text-xs leading-7 text-terminal-muted"><code>{code}</code></pre><div className="decision-list grid gap-4 text-sm leading-6 text-terminal-muted">{decisions.map(([name, description, color]) => <p key={name}><span className={`font-mono ${color}`}>{name}</span><br />{description}</p>)}</div></div><div className="grid min-w-0 gap-4"><p className="eyebrow">TypeScript SDK</p><pre className="code-card min-w-0 overflow-x-auto p-6 text-xs leading-7 text-terminal-muted"><code>{sdkCode}</code></pre><p className="text-sm leading-6 text-terminal-muted"><code className="font-mono text-terminal-text">@ledgerline/core</code> is available in this repo&apos;s <code className="font-mono text-terminal-text">sdk/</code> directory -- a typed viem client over the live Registry/Policy/LendingAdapter/VaultAdapter/TransferAdapter deployment.</p></div></section>
+      {/* Inputs */}
+      <section id="inputs" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24">
+        <SectionHeading eyebrow="Policy inputs" title="Policy is state-aware.">
+          <p>A balance and a price are not the whole story. Tokenized assets carry lifecycle state that can change whether an action should execute at all.</p>
+        </SectionHeading>
+        <div className="flex flex-col gap-6">
+          <dl className="input-list">
+            {inputs.map((i) => <div key={i.name}><dt>{i.name}</dt><dd>{i.text}</dd></div>)}
+          </dl>
+          <div className="signal-card font-mono text-xs leading-7 text-terminal-muted sm:text-sm">STATE + POSITION + RISK + LIFECYCLE + ACTION <span className="text-terminal-accent">→</span> <span className="text-terminal-text">POLICY DECISION</span></div>
+        </div>
+      </section>
 
-      <section className="flex flex-col gap-7 py-20 md:flex-row md:items-end md:justify-between md:py-24"><div><p className="eyebrow">Build with conviction</p><h2 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">Make every financial action explainable.</h2></div><div className="flex gap-3"><Link href="/app" className="primary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em]">Explore Core →</Link><DisabledGitHubLink /></div></section>
+      {/* Agent example */}
+      <section id="agent-example" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24">
+        <SectionHeading eyebrow="Agent intent / policy evaluation" title="An agent asks. CortexRails answers.">
+          <p>An illustrative $200,000 TSLA position under the testnet configuration (70% collateral factor, 80% risk adjustment) has $112,000 of borrowing capacity.</p>
+          <p>This walkthrough is illustrative. The policy engine at <Link href="/app#agent-demo" className="text-terminal-text underline underline-offset-4">/app</Link> runs the same flow against the deployed contract with your connected wallet&apos;s real position.</p>
+        </SectionHeading>
+        <div className="agent-exchange">
+          <div className="agent-turn"><span className="agent-role">Agent</span><p>&ldquo;Borrow 120,000 USDG against TSLA.&rdquo;</p></div>
+          <div className="agent-turn agent-turn-policy">
+            <span className="agent-role">CortexRails</span>
+            <div className="font-mono text-2xl font-semibold text-decision-limit">LIMIT</div>
+            <dl className="agent-result"><div><dt>Requested</dt><dd>$120,000</dd></div><div><dt>Permitted</dt><dd>$112,000</dd></div><div><dt>Reason</dt><dd>EXCEEDS_CAPACITY</dd></div></dl>
+          </div>
+          <div className="agent-turn"><span className="agent-role">Agent adjusts</span><p>&ldquo;Borrow 112,000 USDG.&rdquo;</p></div>
+          <div className="agent-turn agent-turn-policy">
+            <span className="agent-role">CortexRails</span>
+            <div className="font-mono text-2xl font-semibold text-decision-allow">ALLOW</div>
+            <dl className="agent-result"><div><dt>Requested</dt><dd>$112,000</dd></div><div><dt>Permitted</dt><dd>$112,000</dd></div><div><dt>Reason</dt><dd>OK</dd></div></dl>
+          </div>
+          <div className="agent-turn"><span className="agent-role">Execution</span><p>LendingAdapter.borrow() re-evaluates policy, checks existing debt, then transfers USDG.</p></div>
+        </div>
+      </section>
 
-      <footer className="flex flex-col gap-5 border-t border-terminal-border py-7 text-xs text-terminal-muted sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><span className="brand-mark brand-mark-small" aria-hidden="true"><span className="brand-mark-line brand-mark-line-a" /><span className="brand-mark-line brand-mark-line-b" /><span className="brand-mark-line brand-mark-line-c" /></span><span>CortexRails</span></div><div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[.12em]"><a href="#product" className="transition-colors hover:text-terminal-text">Product</a><a href="#architecture" className="transition-colors hover:text-terminal-text">Architecture</a><a href="#developer" className="transition-colors hover:text-terminal-text">Developers</a><span className="text-terminal-border">v1.0 testbed</span></div></footer>
+      {/* Deployment */}
+      <section id="deployment" className="feature-section scroll-mt-24 border-b border-terminal-border py-20 md:py-24">
+        <div className="grid gap-10 md:grid-cols-[.7fr_1.3fr]">
+          <SectionHeading eyebrow="Live deployment" title="Deployed on Robinhood Chain testnet.">
+            <p>Chain ID 46630. The current testnet deployment demonstrates CortexRails against the real TSLA Stock Token and USDG contracts, while policy state and reference pricing remain operator-configured in the test environment.</p>
+          </SectionHeading>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="status-block"><span className="eyebrow status-real">Real / deployed</span><ul><li>Robinhood Chain testnet</li><li>Real TSLA Stock Token collateral</li><li>Real USDG borrow asset (6-decimal scaling)</li><li>Stylus PositionEngine and RiskEngine</li><li>Registry, Policy, three consumer adapters</li><li>canExecute() computed live on every call</li></ul></div>
+            <div className="status-block"><span className="eyebrow status-config">Operator-configured</span><ul><li>Policy reference price ($364.27)</li><li>Lifecycle state</li><li>Collateral factor and risk adjustment</li><li>No oracle pushes into the Registry automatically</li></ul></div>
+            <div className="status-block"><span className="eyebrow status-none">Not claimed</span><ul><li>Mainnet or production readiness</li><li>Decentralized live equity pricing</li><li>Automatic oracle-to-policy sync</li><li>Support for every tokenized asset</li><li>Third-party audit</li></ul></div>
+          </div>
+        </div>
+        <div className="mt-12 overflow-x-auto">
+          <table className="address-table">
+            <thead><tr><th scope="col">Contract</th><th scope="col">Role</th><th scope="col">Address</th></tr></thead>
+            <tbody>
+              {deployed.map((d) => (
+                <tr key={d.address}>
+                  <td className="font-mono text-terminal-text">{d.name}</td>
+                  <td>{d.role}</td>
+                  <td><a href={`${EXPLORER}/address/${d.address}`} target="_blank" rel="noreferrer" className="font-mono text-terminal-text underline-offset-4 hover:text-terminal-accent hover:underline" title={d.address}>{short(d.address)} ↗</a></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-4 max-w-3xl text-xs leading-6 text-terminal-muted">The live WITHDRAW consumer is the VaultAdapter build that predates the debt-safety check. The debt-safe build is in the repository with passing tests; its testnet redeploy has not landed on chain yet. Full history and block numbers are in <a href={`${REPO}/blob/master/docs/DEPLOYMENTS.md`} target="_blank" rel="noreferrer" className="text-terminal-text underline underline-offset-4">DEPLOYMENTS.md</a>.</p>
+        </div>
+      </section>
+
+      {/* Architecture */}
+      <section id="architecture" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24">
+        <SectionHeading eyebrow="Architecture" title="Deciding is separate from executing.">
+          <p>The Registry holds state. Two stateless Stylus contracts compute position value and capacity. Policy turns that into a decision. Adapters custody funds and enforce the decision. The agent layer sits outside this deterministic core.</p>
+        </SectionHeading>
+        <ol className="stack-list">
+          {stack.map(([layer, impl], index) => (
+            <li key={layer} className={layer === "Policy" ? "stack-core" : undefined}><span className="font-mono text-[10px] text-terminal-muted">{String(index + 1).padStart(2, "0")}</span><strong>{layer}</strong><small>{impl}</small></li>
+          ))}
+        </ol>
+      </section>
+
+      {/* Developers */}
+      <section id="developer" className="feature-section grid scroll-mt-24 gap-10 border-b border-terminal-border py-20 md:grid-cols-[.7fr_1.3fr] md:py-24">
+        <SectionHeading eyebrow="Developers" title="Integrate the decision surface.">
+          <p>Applications and autonomous agents can submit structured action intents to CortexRails and receive the authoritative policy result before execution.</p>
+          <p className="font-mono text-xs text-terminal-text">Intent → SDK → CortexRails Policy → Decision</p>
+          <p>Solidity consumers call <code className="font-mono text-terminal-text">canExecute()</code> directly. Offchain code uses <code className="font-mono text-terminal-text">@ledgerline/core</code>, a typed viem client in this repo&apos;s <code className="font-mono text-terminal-text">sdk/</code> directory. It is not yet published to npm.</p>
+          <div className="flex flex-wrap gap-4 pt-1 font-mono text-xs"><a href={`${REPO}/tree/master/sdk`} target="_blank" rel="noreferrer" className="text-terminal-text underline underline-offset-4 hover:text-terminal-accent">SDK source ↗</a><a href={`${REPO}/blob/master/docs/POLICY.md`} target="_blank" rel="noreferrer" className="text-terminal-text underline underline-offset-4 hover:text-terminal-accent">Policy rules ↗</a><a href={`${REPO}/blob/master/docs/ARCHITECTURE.md`} target="_blank" rel="noreferrer" className="text-terminal-text underline underline-offset-4 hover:text-terminal-accent">Architecture ↗</a></div>
+        </SectionHeading>
+        <div className="min-w-0"><p className="eyebrow mb-3">TypeScript · sdk/src/agent.ts</p><pre className="code-card min-w-0 overflow-x-auto p-6 text-xs leading-6 text-terminal-muted"><code>{sdkCode}</code></pre></div>
+      </section>
+
+      <section className="flex flex-col gap-7 py-20 md:flex-row md:items-end md:justify-between md:py-24">
+        <div><p className="eyebrow">Agents propose. CortexRails decides. Adapters execute.</p><h2 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">Evaluate a real position against the deployed policy.</h2></div>
+        <div className="flex flex-wrap gap-3"><Link href="/app" className="primary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] text-terminal-accent-fg">Explore the policy engine →</Link><a href={REPO} target="_blank" rel="noreferrer" className="secondary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] transition-colors hover:bg-terminal-surface">View on GitHub</a></div>
+      </section>
+
+      <footer className="flex flex-col gap-5 border-t border-terminal-border py-7 text-xs text-terminal-muted sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><span className="brand-mark brand-mark-small" aria-hidden="true"><span className="brand-mark-line brand-mark-line-a" /><span className="brand-mark-line brand-mark-line-b" /><span className="brand-mark-line brand-mark-line-c" /></span><span>CortexRails Protocol</span></div><div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[.12em]"><a href="#primitive" className="transition-colors hover:text-terminal-text">Primitive</a><a href="#deployment" className="transition-colors hover:text-terminal-text">Deployment</a><a href="#developer" className="transition-colors hover:text-terminal-text">Developers</a><a href={REPO} target="_blank" rel="noreferrer" className="transition-colors hover:text-terminal-text">GitHub</a><span className="text-terminal-border">Testnet</span></div></footer>
     </main>
   );
 }

@@ -16,28 +16,42 @@ Source of truth: `contracts/broadcast/DeployTestnetRealV2.s.sol/46630/run-latest
 | Contract | Address | Deploy block | Deploy tx |
 |---|---|---|---|
 | `LedgerLineLendingAdapter` | `0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97` | 122446946 | `0x5bde0152f9602b912d62ff7261ff04959a4b73752b7fcbb8817ce1b06923a699` |
-| `LedgerLineVaultAdapter` | `0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac` | not recorded in this repo | not recorded in this repo |
+| `LedgerLineVaultAdapter` (live, pre-debt-check build) | `0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67` | not recorded in this repo | not recorded in this repo |
 | `LedgerLineTransferAdapter` | `0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943` | 123081162 | `0x09db3fe80e2c5fba8b21d71cfbea093fb252333de553dc9789a46909f8c5997a` |
 | `RobinhoodStockTokenAdapter` | `0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9` | 122531798 | `0xdebba93e4771b6bcaee54eb3c2c7503c77ad1e672c95c6c4212e4ef77307b49c` |
 | `MockChainlinkFeed` (reference price for the above) | `0x4548F12F03c3123983b046EAc237876E03A2D7e3` | 122446900 | `0x8eb349b06a4c191efb88bc3aea99f24e9d686c091fed61a24821ddfbbec72713` |
 
-`LedgerLineVaultAdapter` was redeployed at the address above by
-`contracts/script/RedeployVaultAdapter.s.sol` after commit `9fa2c38`
-added a debt-safety check to `withdraw()` (it now blocks withdrawals
-that would leave outstanding `LendingAdapter` debt uncollateralized).
-The new instance was re-authorized as a releaser on `LendingAdapter`
-by the same deploy script. **Unlike the other entries in this table,
-this redeploy's broadcast receipt was not run against this repo's
-Foundry project** (`contracts/broadcast/RedeployVaultAdapter.s.sol/`
-does not exist here), so its deploy block and tx hash are not
-recorded — the address above is taken from the deploy script's own
-console output, not re-derived from a broadcast file the way every
-other address in this document is. Re-derive and fill in the block/tx
-columns above from the actual broadcast log if it becomes available.
+**`LedgerLineVaultAdapter`: the debt-safe redeploy never reached
+chain.** `contracts/script/RedeployVaultAdapter.s.sol` was meant to
+redeploy VaultAdapter after commit `9fa2c38` added a debt-safety check
+to `withdraw()`. Checked live on 2026-09-24:
 
-| Contract | Old address | Status |
+- `0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac`, the address previously
+  recorded here as the redeployed instance, has **no bytecode**
+  (`cast code` returns `0x`).
+- `LendingAdapter.isAuthorizedReleaser(0x0F70…93ac)` is `true`, so the
+  manual `cast send setAuthorizedReleaser` step did run, against an
+  empty address.
+- The pre-fix instance `0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67` has
+  bytecode, is still an authorized releaser, and is the contract the
+  recorded Vault withdrawal in `docs/DEMO.md` actually called.
+
+Likely cause: `forge script --broadcast` broadcasts nothing if any call
+in `run()` reverts during simulation. The script's own comment records
+that its `setAuthorizedReleaser` call reverted (the deployer key isn't
+the LendingAdapter owner), so the `new LedgerLineVaultAdapter` was only
+simulated and its console-logged address was never deployed.
+
+**Live WITHDRAW consumer:** the pre-fix instance above. It gates on
+`canExecute(..., Action.WITHDRAW, ...)` but does **not** check
+outstanding `LendingAdapter` debt. To fix: deploy the current
+`LedgerLineVaultAdapter` for real, authorize it with the LendingAdapter
+owner key, revoke `0x5d27…8D67`'s releaser authorization, and point
+`sdk/src/addresses.ts` / `NEXT_PUBLIC_VAULT_ADAPTER_ADDRESS` at it.
+
+| Contract | Address | Status |
 |---|---|---|
-| `LedgerLineVaultAdapter` (pre-fix) | `0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67` | Abandoned — `withdraw()` does not check outstanding debt on this instance; do not use |
+| `LedgerLineVaultAdapter` (intended debt-safe redeploy) | `0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac` | **No code on chain.** Authorized as a releaser anyway; do not use |
 
 `LedgerLineTransferAdapter` was deployed fresh (not a redeploy of an
 earlier instance — TRANSFER never had a consumer before) by
@@ -87,15 +101,16 @@ decision path — see `docs/INTEGRATIONS.md`.
 
 ## Stylus engines (PositionEngine / RiskEngine)
 
-**Not recorded in this repository.** `DeployTestnetRealV2.s.sol` takes
-`POSITION_ENGINE_ADDRESS` and `RISK_ENGINE_ADDRESS` as environment
-variables at deploy time (Stylus/WASM contracts are deployed
-separately via `cargo stylus deploy`, outside Foundry's broadcast
-mechanism) and no deploy log, `.env` file, or broadcast artifact in
-this repo persists the resulting addresses. They can be read live off
-the deployed `LedgerLinePolicy` contract above (`positionEngine()` and
-`riskEngine()` are both public state variables), or supplied directly
-if you have your own deployment record — ask before assuming either.
+Deployed via `cargo stylus deploy`, outside Foundry's broadcast
+mechanism, so no broadcast artifact in this repo records them.
+`DeployTestnetRealV2.s.sol` takes them as `POSITION_ENGINE_ADDRESS` /
+`RISK_ENGINE_ADDRESS`. Read live from the deployed `LedgerLinePolicy`
+(`positionEngine()` / `riskEngine()`) on 2026-09-24; both have bytecode:
+
+| Contract | Address |
+|---|---|
+| `PositionEngine` (Stylus) | `0xde8365dAF3CFdF952E2F946F19a4DcAcd57eFf0F` |
+| `RiskEngine` (Stylus) | `0xf661dA9D3f214A181014Bc7ba8590B90F9314eC4` |
 
 ## Abandoned V1 deployment
 

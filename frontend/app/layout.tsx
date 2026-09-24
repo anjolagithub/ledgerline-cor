@@ -4,7 +4,7 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "CortexRails Protocol",
-  description: "Programmable position, risk and policy layer for tokenized real-world assets.",
+  description: "The policy layer between intent and financial execution. A deterministic onchain policy primitive for tokenized-asset finance.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

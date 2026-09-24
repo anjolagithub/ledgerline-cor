@@ -1,147 +1,285 @@
 # CortexRails Protocol
 
-**Policy infrastructure for autonomous finance.**
+## The policy layer between intent and financial execution.
 
-A reusable onchain policy primitive for tokenized real-world assets and
-the autonomous agents/protocols acting on them: one function,
-`canExecute()`, that any lending market, vault, agent, or other
-money-moving consumer calls before it acts, and that returns a
-deterministic ALLOW / LIMIT / REVIEW / BLOCK decision. The underlying
-contracts, tests, and deployment retain their original `LedgerLine`
-technical names — see the Roadmap section below for the naming history.
+CortexRails is an onchain policy primitive for tokenized-asset finance.
+Financial protocols and autonomous agents call CortexRails before
+executing an action, and receive a deterministic **ALLOW**, **LIMIT**,
+**REVIEW**, or **BLOCK** decision based on asset state, position risk,
+lifecycle conditions, and action-specific rules.
 
-Built for the Arbitrum Open House Singapore online buildathon.
-First deep integration and proving ground: Robinhood Chain Stock Tokens.
+**Agents propose. CortexRails decides. Adapters execute.**
 
-## The problem
+Deployed on Robinhood Chain testnet against the real TSLA Stock Token
+and USDG. Built for the Arbitrum Open House Singapore online
+buildathon. The underlying contracts and SDK keep their original
+`LedgerLine*` technical names (see [Naming](#naming)).
 
-Every protocol that lets users borrow, withdraw, or otherwise act
-against a tokenized real-world asset position ends up writing its own
-risk logic, inline, inside the contract that also custodies funds.
-That logic is hard to audit in isolation, impossible to reuse across a
-second product without copy-pasting it, and easy to get subtly wrong
-per integration — especially once the underlying asset has a
-lifecycle (corporate actions, suspensions, redemptions) that a plain
-ERC-20 balance can't express.
+## Why CortexRails
 
-CortexRails separates **"is this action allowed right now"** from
-**"how do we actually move the money."** The decision lives in one
-place; consuming contracts (and, increasingly, autonomous agents that
-propose actions on their behalf) enforce it and hold the funds.
+Every protocol that lets users borrow, withdraw, or move a
+tokenized-asset position ends up writing its own risk logic inline,
+inside the contract that also custodies funds. That logic is hard to
+audit in isolation, can't be reused by a second product without
+copy-pasting it, and is easy to get subtly wrong. This gets worse once
+the asset has a lifecycle (corporate actions, suspensions, redemptions)
+that a plain ERC-20 balance can't express.
 
-## The core primitive
+CortexRails separates two questions that financial applications
+usually mix together:
+
+1. **Policy decision.** Is this action permitted right now, and up to
+   what amount?
+2. **Financial execution.** Custody the funds, update the books, move
+   the tokens.
+
+The decision lives in one reusable place. Consuming contracts (and the
+agents that propose actions to them) enforce it and hold the funds.
+
+## How it works
+
+```
+Agent / Protocol
+      │  intent: { asset, positionId, action, amount }
+      ▼
+CortexRails  ── LedgerLinePolicy.canExecute()
+      │          reads Registry state, calls Stylus PositionEngine + RiskEngine
+      ▼
+Decision     ── ALLOW / LIMIT / REVIEW / BLOCK, permittedAmount, reason
+      ▼
+Adapter      ── re-calls canExecute() in the same transaction, applies its own
+      │          debt checks, then executes
+      ▼
+Execution    ── borrow / withdraw / transfer
+```
+
+## The policy primitive
 
 ```solidity
+// contracts/src/interfaces/ILedgerLinePolicy.sol
 function canExecute(
     uint256 assetId,
     uint256 positionId,
     Action action,
     uint256 amount
-) external view returns (PolicyResponse memory);
-// PolicyResponse { Decision decision; uint256 permittedAmount; bytes32 reason; }
+) external view returns (PolicyResponse memory response);
+
+// contracts/src/interfaces/LedgerLineTypes.sol
+struct PolicyResponse {
+    Decision decision;        // ALLOW | LIMIT | REVIEW | BLOCK
+    uint256 permittedAmount;  // the maximum permitted, never the request echoed back
+    bytes32 reason;           // "OK", "EXCEEDS_CAPACITY", "NO_CAPACITY", "RESTRICTED", ...
+}
 ```
 
 `LedgerLinePolicy.canExecute` reads asset and position state from
-`LedgerLineRegistry` (the single state store), computes economic
-position value and borrowing capacity via two stateless Arbitrum
-Stylus (Rust/WASM) contracts — `PositionEngine` and `RiskEngine` — and
-returns a decision. It never moves funds and never enforces anything
-itself; that's the calling contract's job. See
-[`docs/POLICY.md`](docs/POLICY.md) for the exact decision rules per
-action.
+`LedgerLineRegistry` (the single state store). It computes position
+value and borrowing capacity through two stateless Arbitrum Stylus
+(Rust/WASM) contracts, `PositionEngine` and `RiskEngine`, and returns a
+decision. It is a `view` function: it never moves funds and never
+enforces anything itself. That is the calling contract's job.
 
-## The three-consumer proof
+**Decision semantics** (exact rules in [`docs/POLICY.md`](docs/POLICY.md)):
 
-The core claim of this project is that the *same*, unmodified
-Policy/Registry/engines stack can back more than one real, independent
-consumer contract:
+| Decision | When | `permittedAmount` |
+|---|---|---|
+| `BLOCK` | Asset lifecycle is anything other than `ACTIVE` (reason = the state name), or computed capacity is zero (`NO_CAPACITY`) | `0` |
+| `LIMIT` | BORROW request exceeds capacity (`EXCEEDS_CAPACITY`) | capacity |
+| `ALLOW` | Request is within capacity (BORROW), or lifecycle is `ACTIVE` (WITHDRAW / TRANSFER) | capacity (BORROW) or full position (WITHDRAW / TRANSFER) |
+| `REVIEW` | Reserved in the `Decision` enum for a manual-review path. **No branch returns it today.** | n/a |
 
-- **`LedgerLineLendingAdapter`** — real collateral custody (deposit)
-  and borrowing (borrow), gated by `Action.BORROW`: capacity-based,
-  checked against the caller's existing debt.
-- **`LedgerLineVaultAdapter`** — LedgerLine's second reference
-  consumer, deliberately *not* a second lending market. It calls the
-  same `canExecute()` with `Action.WITHDRAW`, gets an independent
-  ALLOW/BLOCK decision evaluated purely on asset lifecycle (not
-  borrowing capacity), and only then asks `LendingAdapter` to release
-  the already-custodied collateral it doesn't itself hold.
-- **`LedgerLineTransferAdapter`** — the third reference consumer, and
-  the first with a mechanic genuinely different from the other two:
-  it moves no tokens at all. It calls the same `canExecute()` with
-  `Action.TRANSFER` (lifecycle-gated only, same rule as WITHDRAW), and
-  on ALLOW reassigns which `positionId` in `Registry` owns a given
-  `rawBalance` — the underlying collateral never leaves
-  `LendingAdapter`'s custody. Its own debt-safety rule is stricter
-  than `VaultAdapter`'s: any outstanding debt at all blocks the
-  transfer outright (not a recomputed remaining-capacity check),
-  because collateral changing owners invalidates whatever LTV math
-  applied to the original owner's debt.
+LIMIT never quietly reduces the caller's request. It returns the
+maximum permitted amount, and the caller decides whether to resubmit.
 
-Adding the second and third consumers required **zero changes** to
-`LedgerLineRegistry` or either Stylus engine, and exactly one addition
-to `LedgerLinePolicy` each time: a real per-action branch for
-`Action.WITHDRAW`, then the same pattern again for `Action.TRANSFER`
-(both previously reserved but unimplemented). `docs/POLICY.md` and the
-test suites (`LedgerLineVaultAdapter.t.sol`,
-`LedgerLineTransferAdapter.t.sol`) show all three consumers exercising
-the same policy core side by side, with the earlier consumers'
-behavior unchanged and re-tested each time a new one was added.
+## Multiple consumers
 
-A fourth proof point exists in `sdk/` — `@ledgerline/core`, a typed
-TypeScript client (`LedgerLineClient`) that talks to all five deployed
-contracts (Registry, Policy, LendingAdapter, VaultAdapter,
-TransferAdapter) through the same interfaces the Solidity consumers
-use, so an entirely different kind of consumer (an offchain script, a
-bot, another frontend) doesn't need to reimplement any of this.
+The same, unmodified Registry, Stylus engines, and Policy back three
+independent consumer contracts:
 
-## The agent-facing intent layer
+| Action | Consumer | What `canExecute()` checks | What the adapter adds |
+|---|---|---|---|
+| **BORROW** | `LedgerLineLendingAdapter` | Lifecycle `ACTIVE`; request vs. capacity = position value × collateral factor × risk adjustment | Existing debt + request ≤ `permittedAmount` (Policy is debt-agnostic) |
+| **WITHDRAW** | `LedgerLineVaultAdapter` | Lifecycle `ACTIVE`; permitted up to the full position | Remaining capacity must still cover outstanding debt (see the [deployment caveat](#security--limitations)) |
+| **TRANSFER** | `LedgerLineTransferAdapter` | Lifecycle `ACTIVE`; permitted up to the full position | Any outstanding debt blocks the transfer outright. No tokens move; Registry ownership is reassigned in custody |
 
-CortexRails' framing as "policy infrastructure for autonomous finance"
-is backed by a real, minimal, non-AI translation layer around this same
-`canExecute()` — not a chatbot, not an LLM, not a second risk engine.
-`sdk/src/agent.ts` (`evaluateAgentIntent`, `suggestRetryIntent`) and
-`frontend/lib/agentIntent.ts` both resolve a structured intent
-(`{ asset, positionId, action, amount }`) into the real onchain call and
-decode the response back to human units — nothing else. The frontend's
-`/app` Policy Console includes a live "Agent Intent → Policy →
-Execution" demo section exercising the full loop: an over-capacity
-BORROW intent evaluates to `LIMIT`, a retry at the real permitted amount
-evaluates fresh to `ALLOW`, and only then does the same wallet-connected
-write flow every other action here uses actually execute. See
-`docs/ARCHITECTURE.md`'s "Agent-facing intent layer" section and
-`docs/DEMO.md` step 6 for the full walkthrough.
+Adding WITHDRAW and then TRANSFER needed **zero changes** to
+`LedgerLineRegistry` or either Stylus engine, and one new per-action
+branch in `LedgerLinePolicy` each time. The test suites
+(`LedgerLineVaultAdapter.t.sol`, `LedgerLineTransferAdapter.t.sol`)
+re-test the earlier consumers' behavior each time a new one was added.
 
-## Live on Robinhood Chain testnet
+## Autonomous agents
 
-Chain ID **46630**. Real deployment, not a simulation:
+Agents propose. CortexRails decides. Adapters execute.
 
-| Contract | Address |
+An autonomous agent can decide what it wants to do. A financial
+protocol still needs a deterministic boundary that decides what it is
+actually allowed to do. CortexRails is that boundary. It is **not** an
+AI model, a chatbot, or a second risk engine.
+
+`sdk/src/agent.ts` (`evaluateAgentIntent`, `suggestRetryIntent`)
+resolves a structured intent (`{ asset, positionId, action, amount }`)
+into the real `canExecute()` call and decodes the response to human
+units. That is all it does. The decision, permitted amount, and reason
+are the onchain answer, unmodified.
+
+Example against a $200,000 TSLA position under the testnet
+configuration (70% collateral factor, 80% risk adjustment, so $112,000
+of capacity):
+
+```
+Agent:        BORROW 120000 USDG against TSLA
+CortexRails:  LIMIT   permittedAmount 112000   reason EXCEEDS_CAPACITY
+Agent:        BORROW 112000 (suggestRetryIntent)
+CortexRails:  ALLOW   permittedAmount 112000   reason OK
+Adapter:      LendingAdapter.borrow() re-checks policy + existing debt, transfers USDG
+```
+
+The frontend's `/app` Policy Console has a live "Agent Intent → Policy
+→ Execution" section that runs this loop against the deployed Policy
+with the connected wallet's real position (`docs/DEMO.md` step 6).
+
+## Live deployment
+
+**Robinhood Chain testnet, chain ID 46630.** The current testnet
+deployment demonstrates CortexRails against the real TSLA Stock Token
+and USDG contracts, while policy state and reference pricing remain
+operator-configured in the test environment.
+
+| | |
 |---|---|
-| `LedgerLineRegistry` | `0x88508A6d9266fbc928cC11DEE92f4EB1801B907c` |
-| `LedgerLinePolicy` | `0x22fA5c1C36Cc1F7557B932dE7aCDa354ee4F6F52` |
-| `LedgerLineLendingAdapter` | `0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97` |
-| `LedgerLineVaultAdapter` | `0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac` |
-| `LedgerLineTransferAdapter` | `0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943` |
+| **Real / deployed** | Robinhood Chain testnet · real TSLA Stock Token (collateral) · real USDG (borrow asset, 6-decimal scaling) · Stylus PositionEngine and RiskEngine · Registry · Policy · Lending, Vault, and Transfer adapters · `canExecute()` computed live on every call · agent-intent SDK layer |
+| **Operator-configured** | Registry reference price ($364.27) · lifecycle state · collateral factor (70%) and risk adjustment (80%) |
+| **Not claimed** | Mainnet or production readiness · decentralized live equity pricing · automatic oracle-to-policy sync · support for every tokenized asset · third-party audit |
 
-Full address list, block numbers, and the abandoned V1 deployment's
-history are in [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md).
+Explorer: <https://explorer.testnet.chain.robinhood.com>. All addresses
+are listed [below](#deployment-addresses).
 
-**Real collateral, real borrow asset:** the deployment uses
-Robinhood's real, live TSLA Stock Token as collateral
-(`0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E`, 18 decimals) and real
-USDG (`0x7E955252E15c84f5768B83c41a71F9eba181802F`, 6 decimals) as the
-borrowable asset — not mock tokens. Every internal amount (debt,
-`canExecute`'s `amount`/`permittedAmount`) is a fixed 18-decimal unit
-regardless of a token's real decimals; `LedgerLineLendingAdapter`
-scales to USDG's real 6 decimals only at the final transfer. Getting
-this scaling wrong was a real bug found and fixed during integration —
-see below.
+## Architecture
+
+```
+Asset adapter       RobinhoodStockTokenAdapter    (deployed; not yet wired into Registry)
+      ↓
+Registry / state    LedgerLineRegistry            (single state store; owner-set asset params)
+      ↓
+Position engine     PositionEngine  (Stylus)      position value = rawBalance × price × multiplier
+      ↓
+Risk engine         RiskEngine      (Stylus)      capacity = value × collateralFactor × riskAdjustment
+      ↓
+Policy              LedgerLinePolicy              canExecute() → decision
+      ↓
+Financial adapter   Lending / Vault / Transfer    custody, debt accounting, execution
+```
+
+The agent layer sits outside this deterministic core. Every amount
+inside the core (debt, `amount`, `permittedAmount`) is an 18-decimal
+internal unit. `LedgerLineLendingAdapter` scales to USDG's real 6
+decimals only at the final transfer. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the contract graph,
+the Solidity/Stylus boundary, and state ownership.
+
+## Security / limitations
+
+Full detail in [`docs/SECURITY.md`](docs/SECURITY.md). The ones that
+matter most:
+
+- **Operator-configured policy state.** Price, lifecycle, and risk
+  parameters on the live Registry are set by the contract owner
+  (`updateAssetParameters` / `transitionLifecycle`). No oracle pushes
+  into Registry. `RobinhoodStockTokenAdapter` is deployed and can read
+  TSLA data, but it is not wired into the live decision path, and no
+  Chainlink tokenized-equity feed exists for Robinhood Chain testnet
+  (details in [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)).
+- **The debt-safe VaultAdapter is not live on testnet.** The
+  debt-safety check in `LedgerLineVaultAdapter.withdraw()` is
+  implemented and tested, but its redeploy never landed on chain. The
+  address previously recorded for it
+  (`0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac`) has no bytecode. The
+  live, authorized WITHDRAW consumer is still the pre-fix instance
+  (`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`), which does not check
+  debt. See [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md).
+- **No `repay()`.** Debt is permanent once borrowed, so a position that
+  has borrowed can never pass TransferAdapter's (or the fixed
+  VaultAdapter's) debt check again.
+- **Policy is debt-agnostic.** For BORROW, `canExecute()` compares only
+  the new request to capacity. Consumers must add existing debt
+  themselves, as `LedgerLineLendingAdapter` does.
+- **No upgradeability, no audit.** Nothing here claims production
+  readiness, audit coverage, or gas benchmarks.
+
+## Developer integration
+
+**Solidity.** Call `canExecute()` before acting, and enforce the result
+yourself. From `LedgerLineLendingAdapter.borrow()`:
+
+```solidity
+PolicyResponse memory response = policy.canExecute(assetId, positionId, Action.BORROW, amount);
+if (response.decision == Decision.BLOCK) revert PolicyBlocked(response.reason);
+uint256 wouldOweTotal = debt[msg.sender] + amount;
+if (wouldOweTotal > response.permittedAmount) revert ExceedsPermittedAmount(wouldOweTotal, response.permittedAmount);
+```
+
+**TypeScript.** `sdk/` is `@ledgerline/core`, a typed viem client over
+Registry, Policy, and the three adapters. It defaults to the testnet
+addresses and is not yet published to npm.
+
+```ts
+import { LedgerLineClient, Action, evaluateAgentIntent, suggestRetryIntent } from "@ledgerline/core";
+
+const client = new LedgerLineClient({ rpcUrl: "https://rpc.testnet.chain.robinhood.com" });
+
+// Direct policy read (amounts are 18-decimal internal units)
+const positionId = LedgerLineClient.positionIdFromAddress(wallet);
+const check = await client.canExecute(positionId, Action.BORROW, 120_000n * 10n ** 18n);
+
+// Agent-facing intent (human-unit amounts)
+const intent = { asset: "TSLA", positionId: wallet, action: "BORROW" as const, amount: "120000" };
+const result = await evaluateAgentIntent(client, intent);
+// result: { decision, requestedAmount, permittedAmount, reason, assetId, positionId, action, raw }
+const retry = suggestRetryIntent(intent, result); // defined only when decision === "LIMIT"
+```
+
+See [`sdk/README.md`](sdk/README.md) and `sdk/src/client.ts` for the
+full read/write surface and its amount and confirmation conventions.
+
+## Deployment addresses
+
+Robinhood Chain testnet (46630). Sourced from
+`contracts/broadcast/*/46630/run-latest.json` and checked against live
+chain state. Block numbers and deploy transactions are in
+[`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md).
+
+| Contract | Role | Address |
+|---|---|---|
+| `LedgerLineRegistry` | State store | [`0x88508A6d9266fbc928cC11DEE92f4EB1801B907c`](https://explorer.testnet.chain.robinhood.com/address/0x88508A6d9266fbc928cC11DEE92f4EB1801B907c) |
+| `LedgerLinePolicy` | `canExecute()` | [`0x22fA5c1C36Cc1F7557B932dE7aCDa354ee4F6F52`](https://explorer.testnet.chain.robinhood.com/address/0x22fA5c1C36Cc1F7557B932dE7aCDa354ee4F6F52) |
+| `PositionEngine` (Stylus) | Position value | [`0xde8365dAF3CFdF952E2F946F19a4DcAcd57eFf0F`](https://explorer.testnet.chain.robinhood.com/address/0xde8365dAF3CFdF952E2F946F19a4DcAcd57eFf0F) |
+| `RiskEngine` (Stylus) | Borrowing capacity | [`0xf661dA9D3f214A181014Bc7ba8590B90F9314eC4`](https://explorer.testnet.chain.robinhood.com/address/0xf661dA9D3f214A181014Bc7ba8590B90F9314eC4) |
+| `LedgerLineLendingAdapter` | BORROW consumer, custody | [`0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97`](https://explorer.testnet.chain.robinhood.com/address/0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97) |
+| `LedgerLineVaultAdapter` | WITHDRAW consumer (pre-debt-check build) | [`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`](https://explorer.testnet.chain.robinhood.com/address/0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67) |
+| `LedgerLineTransferAdapter` | TRANSFER consumer | [`0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943`](https://explorer.testnet.chain.robinhood.com/address/0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943) |
+| `RobinhoodStockTokenAdapter` | Asset adapter (not wired into Registry) | [`0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9`](https://explorer.testnet.chain.robinhood.com/address/0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9) |
+| TSLA Stock Token | Collateral, 18 decimals | [`0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E`](https://explorer.testnet.chain.robinhood.com/address/0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E) |
+| USDG | Borrow asset, 6 decimals | [`0x7E955252E15c84f5768B83c41a71F9eba181802F`](https://explorer.testnet.chain.robinhood.com/address/0x7E955252E15c84f5768B83c41a71F9eba181802F) |
+
+The Stylus engine addresses are read live from
+`LedgerLinePolicy.positionEngine()` / `riskEngine()`; they were deployed
+with `cargo stylus deploy` outside Foundry's broadcast mechanism.
+
+## Tests
+
+```bash
+cd contracts && forge test                          # 31 tests: unit, fuzz, decimal scaling, adapter suites
+cd sdk && npm test                                  # agent-intent layer (stub client, no RPC)
+cd stylus/position-engine && cargo test             # PositionEngine math
+cd stylus/risk-engine && cargo test                 # RiskEngine math
+cd frontend && npm run build                        # type-check + production build
+```
 
 ## Real integration issues found during deployment
 
-These aren't hypothetical edge cases — each was hit while wiring this
-project to real chains and real tokens, and each is now
-regression-tested:
+Each of these came up while wiring the project to real chains and real
+tokens, and each is now regression-tested:
 
 - **USDG's real decimals (6) don't match the internal 18-decimal
   convention.** An earlier version transferred the raw 18-decimal
@@ -149,100 +287,84 @@ regression-tested:
   reading `IERC20Metadata.decimals()` once at construction and scaling
   only at the point of transfer (`LedgerLineDecimalScaling.t.sol`).
 - **The real Stock Token contract doesn't implement `oraclePaused()`**
-  the way Robinhood's own docs assume — the call reverts outright on
+  the way Robinhood's own docs assume. The call reverts outright on
   the live testnet TSLA contract. `RobinhoodStockTokenAdapter` now
   calls it via `try/catch` and falls through to its mandatory
-  staleness check on any failure, matching Robinhood's own
-  documented caveat that the flag is advisory (`RobinhoodStockTokenAdapter.t.sol`).
+  staleness check on any failure, matching Robinhood's own documented
+  caveat that the flag is advisory (`RobinhoodStockTokenAdapter.t.sol`).
 - **No live Chainlink price feed exists for Robinhood Chain testnet at
   all** (Chainlink's tokenized-equity feeds are mainnet-only today),
   and no Chainlink L2 Sequencer Uptime Feed exists for this chain on
-  any network. See [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) for
-  exactly what that means for the current price path.
+  any network. See [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md).
 - **The original `LedgerLineLendingAdapter` had no way to authorize a
   second consumer** to release custodied collateral. Retrofitting it
-  wasn't possible without a storage layout change, so the V2 testnet
-  deployment redeploys the whole stack atomically instead; the old V1
-  adapter is now permanently abandoned with 1 TSLA stranded in it
+  wasn't possible without a storage-layout change, so the V2 testnet
+  deployment redeploys the whole stack atomically instead. The old V1
+  adapter is permanently abandoned with 1 TSLA stranded in it
   (disclosed in `docs/DEPLOYMENTS.md`).
 - **`LedgerLineRegistry` didn't originally bound `collateralFactorBps`
   / `riskAdjustmentBps` to ≤ 100%**, which could let computed borrowing
   capacity exceed real position value. Fixed with an explicit revert
   and covered by fuzz testing.
-
-## What's live vs. what's a deliberate scope boundary
-
-**Live today:** real onchain custody and transfers of real TSLA/USDG;
-every `canExecute` call is computed live against current Registry
-state through the real Stylus engines; lifecycle enforcement; two
-independent, real consumer contracts sharing that same core.
-
-**Deliberate scope boundaries, not oversights:** asset price,
-lifecycle state, and risk parameters on the live deployment are set by
-the contract owner directly (`Registry.updateAssetParameters` /
-`transitionLifecycle`) — there is no automatic oracle push into
-Registry today, even though a real, working `RobinhoodStockTokenAdapter`
-is deployed and capable of reading live TSLA price data. See
-`docs/INTEGRATIONS.md` for the exact reasoning and
-`docs/SECURITY.md` for the trust assumptions this implies. Nothing in
-this codebase claims performance/gas benchmarks, third-party audit
-coverage, or production readiness.
+- **A `forge script --broadcast` run whose later call reverts
+  broadcasts nothing.** The VaultAdapter redeploy script's
+  `setAuthorizedReleaser` call reverted in simulation (wrong key), so
+  the deploy never reached chain. Only the simulated address was
+  printed, and it was later authorized by hand. See the security
+  section above.
 
 ## Repo layout
 
-- `contracts/` — Foundry project (Solidity). Registry, Policy,
+- `contracts/`: Foundry project (Solidity). Registry, Policy,
   LendingAdapter, VaultAdapter, TransferAdapter, the Robinhood Stock
   Token adapter, interfaces, mocks, tests, and deployment scripts.
-- `stylus/` — Rust/Arbitrum Stylus workspace (`position-engine`,
-  `risk-engine`) — the two stateless computation contracts Policy calls.
-- `sdk/` — TypeScript SDK (`@ledgerline/core`), a typed viem client
-  over the five deployed contracts.
-- `frontend/` — Next.js judge-facing demo app (Policy Console +
-  Activity log) against the live V2 testnet deployment.
-- `docs/` — architecture, policy, integration, security, deployment,
-  and demo documentation (see below).
+- `stylus/`: Rust/Arbitrum Stylus workspace (`position-engine`,
+  `risk-engine`), the two stateless computation contracts Policy calls.
+- `sdk/`: TypeScript SDK (`@ledgerline/core`), a typed viem client
+  plus the agent-intent layer.
+- `frontend/`: Next.js app. Landing page, Policy Console and agent demo
+  (`/app`), and Activity log (`/app/activity`) against the live testnet
+  deployment.
+- `docs/`: architecture, policy, integration, security, deployment,
+  and demo documentation.
 
 ## Roadmap
 
-**Naming disclosure:** the public product name is **CortexRails
-Protocol**; the underlying Solidity contracts, tests, deployment
-scripts, and the `@ledgerline/core` SDK package keep their original
-`LedgerLine` technical names unchanged, since renaming a
-deployed/importable identifier for branding alone would break real
-compatibility for no benefit. In short: **CortexRails Protocol —
-powered by the existing LedgerLine Core contracts.** Neither name is
-an established or trademarked product name — treat both as
-provisional for this buildathon submission.
+Natural next additions, given the current, disclosed scope boundaries:
 
-**Natural next additions, given the current, disclosed scope
-boundaries:**
+- Complete the debt-safe `LedgerLineVaultAdapter` redeploy on testnet
+  and revoke the pre-fix instance's releaser authorization.
+- A `repay()` function on `LedgerLineLendingAdapter`. Debt is currently
+  permanent once borrowed.
+- A fourth consumer action, for example `Action.LIQUIDATE`, already
+  reserved in the `Action` enum
+  (`contracts/src/interfaces/LedgerLineTypes.sol`) with no consumer or
+  `Policy` branch yet. TRANSFER's addition needed zero changes to
+  `Registry` or either Stylus engine and exactly one new branch in
+  `LedgerLinePolicy`, the same pattern a LIQUIDATE consumer would
+  follow.
 
-- A `repay()` function on `LedgerLineLendingAdapter`. Per
-  `docs/SECURITY.md`'s known limitations, debt is currently permanent
-  once borrowed — there is no way to reduce it. Adding repayment is
-  the most natural next addition given that gap.
-- A fourth consumer action beyond BORROW, WITHDRAW, and the
-  now-proven TRANSFER (`LedgerLineTransferAdapter`) — for example
-  `Action.LIQUIDATE`, already reserved in the `Action` enum
-  (`contracts/src/interfaces/LedgerLineTypes.sol`) but with no
-  consumer or `Policy` branch implemented yet. TRANSFER's addition
-  required zero changes to `Registry` or either Stylus engine and
-  exactly one new branch in `LedgerLinePolicy` — the same pattern a
-  LIQUIDATE consumer would be expected to follow.
+## Naming
+
+The public product name is **CortexRails Protocol**. The Solidity
+contracts, tests, deployment scripts, and the `@ledgerline/core` SDK
+package keep their original `LedgerLine` technical names, because
+renaming a deployed or importable identifier for branding alone would
+break real compatibility for no benefit. Neither name is an established
+or trademarked product name.
 
 ## Further reading
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — contract graph, the
-  Solidity/Stylus boundary, and state ownership.
-- [`docs/POLICY.md`](docs/POLICY.md) — exactly how `canExecute()`
-  decides BORROW vs. WITHDRAW, and why they differ.
-- [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) — the real Robinhood
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): contract graph, the
+  Solidity/Stylus boundary, state ownership, the agent-facing layer.
+- [`docs/POLICY.md`](docs/POLICY.md): exactly how `canExecute()`
+  decides BORROW vs. WITHDRAW vs. TRANSFER, and why they differ.
+- [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): the real Robinhood
   Chain, TSLA, and USDG integration details, and what's live vs.
   owner-configured.
-- [`docs/SECURITY.md`](docs/SECURITY.md) — trust assumptions, access
+- [`docs/SECURITY.md`](docs/SECURITY.md): trust assumptions, access
   control, and known limitations.
-- [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md) — every deployed
-  address on Robinhood Chain testnet, sourced from the actual
-  broadcast files.
-- [`docs/DEMO.md`](docs/DEMO.md) — a judge-facing walkthrough of the
-  four core flows.
+- [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md): every deployed address
+  on Robinhood Chain testnet, with block numbers and deploy txs.
+- [`docs/DEMO.md`](docs/DEMO.md): a walkthrough of the core flows with
+  real transaction hashes.
