@@ -81,17 +81,18 @@ lifecycle state (`ACTIVE`), not borrowing capacity, per
 wallet and update the shared Registry position. The `Withdrawn` event
 appears in the Activity log.
 
-The live VaultAdapter is now the debt-safe instance
+The live VaultAdapter is the debt-safe instance
 (`0xfF7EC5218730AdbCAa14cdf205cc57F97D335A6b`). It also reverts with
 `WouldUnderCollateralizeDebt` if the withdrawal would leave outstanding
-USDG debt uncovered by the remaining position's capacity. **Historical
-note:** the hash below was recorded earlier against the pre-fix instance
-(`0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67`, now de-authorized),
-which did not check debt. No withdrawal through the debt-safe instance
-has been recorded here yet. Its deploy and authorization txs are in
-`docs/DEPLOYMENTS.md`.
+USDG debt uncovered by the remaining position's capacity. Its deploy
+and authorization txs are in `docs/DEPLOYMENTS.md`.
 
-- Explorer: `https://explorer.testnet.chain.robinhood.com/tx/0xfbb0095b7dcf6a17c9f324879bf082a04c36db53e24d9e8b0fc33080f4c0bdf3`
+The hash below is a real `withdraw(1 TSLA)` through that instance
+(`ALLOW`, block 123634239). Its receipt shows the tx sent to
+`0xfF7E…5A6b`, which emitted `Withdrawn`, and `LendingAdapter` emitting
+`Released` for the TSLA transfer.
+
+- Explorer: `https://explorer.testnet.chain.robinhood.com/tx/0xf7483471e5b898c7ad71b41f328b12d521c36c3d710189257c49e8aa9c7301db`
 
 ## 5. Transfer blocked by outstanding debt
 
