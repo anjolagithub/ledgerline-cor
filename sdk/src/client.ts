@@ -47,14 +47,14 @@ export type WriteOptions = {
   account?: Address;
 };
 
-/// LedgerLineClient -- a thin, typed wrapper over LedgerLine's real
-/// deployed contracts (Registry, Policy, LendingAdapter, VaultAdapter,
-/// TransferAdapter), built on viem.
+/// LedgerLineClient -- a thin, typed wrapper over CortexRails Protocol's
+/// real deployed LedgerLine contracts (Registry, Policy, LendingAdapter,
+/// VaultAdapter, TransferAdapter), built on viem.
 ///
 /// AMOUNT CONVENTION (read this before calling any write method):
 /// every `amount` parameter on this client -- deposit, borrow,
 /// withdraw, transfer, and canExecute -- is an 18-decimal internal unit,
-/// matching LedgerLine's own accounting convention (PositionEngine /
+/// matching CortexRails' own accounting convention (PositionEngine /
 /// RiskEngine / LedgerLineLendingAdapter all use this same
 /// convention internally). This is true regardless of any individual
 /// token's real onchain decimals: TSLA (the collateral token) happens
@@ -239,7 +239,7 @@ export class LedgerLineClient {
 
   /// Withdraws `amount` (18-decimal, see class doc) of previously
   /// deposited collateral (TSLA) via VaultAdapter.withdraw(). This is
-  /// LedgerLine's second, independent real consumer of the same
+  /// CortexRails' second, independent real consumer of the same
   /// Policy/Registry -- it makes its own canExecute() call with
   /// Action.WITHDRAW (evaluated on lifecycle state, not borrowing
   /// capacity) and, only after a non-BLOCK decision, releases the
@@ -266,7 +266,7 @@ export class LedgerLineClient {
 
   /// Reassigns `amount` (18-decimal, see class doc) of the caller's
   /// position to `to` via TransferAdapter.transfer(). This is
-  /// LedgerLine's third, independent real consumer of the same
+  /// CortexRails' third, independent real consumer of the same
   /// Policy/Registry -- it makes its own canExecute() call with
   /// Action.TRANSFER (evaluated on lifecycle state, not borrowing
   /// capacity, exactly like WITHDRAW) and, only after a non-BLOCK

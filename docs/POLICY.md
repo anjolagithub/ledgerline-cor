@@ -1,6 +1,6 @@
 # Policy
 
-`LedgerLinePolicy.canExecute` is LedgerLine's entire reusable policy
+`LedgerLinePolicy.canExecute` is CortexRails' entire reusable policy
 surface. This document describes exactly what it does today, from
 `contracts/src/LedgerLinePolicy.sol`, and nothing it doesn't yet do.
 
@@ -45,9 +45,9 @@ struct PolicyResponse {
 ```
 
 - **`ALLOW`** — the request, on its own, does not exceed what
-  LedgerLine permits.
+  CortexRails permits.
 - **`LIMIT`** — the request exceeds `permittedAmount`. This is a
-  reject-and-resubmit signal, not a clamp: LedgerLine never silently
+  reject-and-resubmit signal, not a clamp: CortexRails never silently
   reduces a request to fit. A calling contract that receives `LIMIT`
   and proceeds anyway is going out of its way to ignore the decision.
 - **`REVIEW`** — reserved for a future manual-review path. No code
@@ -236,3 +236,15 @@ were built to demonstrate.
 - `LedgerLineFuzz.t.sol` — the lifecycle transition table, non-ACTIVE
   always-blocks, zero-price-never-allows-capacity, and
   never-exceeds-capacity properties, all against the real contracts.
+
+## Agent-facing intent wrappers
+
+`sdk/src/agent.ts`'s `evaluateAgentIntent` and `frontend/lib/agentIntent.ts`
+exist purely as intent-translation convenience over this exact
+`canExecute()` -- resolving a human-readable asset symbol/action/amount
+into the real onchain call and decoding the response back to human units.
+Neither has any independent decision logic: no capacity math, no
+alternate lifecycle rule, no second reason vocabulary. See
+`docs/ARCHITECTURE.md`'s "Agent-facing intent layer" section for the full
+picture; this note exists here so nobody reading this file mistakes those
+wrappers for a second policy engine.

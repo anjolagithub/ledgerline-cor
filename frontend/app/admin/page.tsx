@@ -42,7 +42,7 @@ export default function AdminPage() {
     <main className="mx-auto max-w-md px-6 py-8">
       <div className="mb-6">
         <div className="text-xs uppercase tracking-wide text-decision-limit mb-1">Operator Mode</div>
-        <div className="text-lg font-semibold">LedgerLine / Operator</div>
+        <div className="text-lg font-semibold">CortexRails / Operator</div>
       </div>
 
       <div className="rounded border border-terminal-border bg-terminal-surface p-4 space-y-4">

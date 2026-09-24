@@ -1,4 +1,4 @@
-# LedgerLine Core — Security Review
+# CortexRails Protocol — Security Review (Phase 6, LedgerLine Core contracts)
 
 Status: MVP hackathon submission. This document records the security
 review performed in Phase 6 against the checklist in the master build

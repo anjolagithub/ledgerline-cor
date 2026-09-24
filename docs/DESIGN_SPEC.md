@@ -1,4 +1,4 @@
-# LedgerLine Core — Frontend Design Specification
+# CortexRails Protocol — Frontend Design Specification
 
 Status: implementation-ready specification, produced from the Phase 8
 frontend audit. Most of the P0/P1 items below (`PolicyEquation`,
@@ -16,9 +16,9 @@ already exist.
 
 ---
 
-## 1. LedgerLine Visual Language
+## 1. CortexRails Visual Language
 
-LedgerLine communicates through **derivation chains, not fact grids**.
+CortexRails communicates through **derivation chains, not fact grids**.
 Every screen's organizing question is "what produced this number, and
 what does it in turn produce?" rather than "what are the interesting
 facts about this asset?" Concretely this means: numbers that are
@@ -30,7 +30,7 @@ individual fact.
 
 This is not "dark mode + monospace." A financial risk terminal and a
 generic crypto dashboard can share both of those traits; what
-distinguishes LedgerLine is that a viewer can trace *why* a number is
+distinguishes CortexRails is that a viewer can trace *why* a number is
 what it is without leaving the screen.
 
 ---
@@ -122,8 +122,8 @@ internal spacing (8-16px) stays tight.
 
 Top to bottom:
 
-**1. Header bar** — purpose: identity + wallet state. Content: "LedgerLine
-Core" wordmark (heading size, no logo mark needed), network label
+**1. Header bar** — purpose: identity + wallet state. Content: "CortexRails
+Protocol" wordmark (heading size, no logo mark needed), network label
 (micro, muted), connect button (right-aligned). No visual hierarchy
 competition with content below — this is chrome, kept small.
 Interaction: connect/disconnect. Loading: connect button shows
@@ -241,7 +241,7 @@ shown above it — this is why the decision trace (Section 7) covers only
 non-numeric gates.
 
 A one-line statement below the verdict, in micro/muted text, always
-present: *"LedgerLineLendingAdapter enforces this decision onchain."* —
+present: *"The onchain lending adapter enforces this decision."* —
 this is the one-sentence fulfillment of requirement 8 ("the consuming
 protocol enforces the result") without turning it into its own section.
 
@@ -373,7 +373,7 @@ current component inlines its own Tailwind string):**
   `LifecycleIndicator` so it can also represent tx state pills if ever
   needed.
 
-**LedgerLine domain components:**
+**CortexRails domain components:**
 
 - `PolicyEquation` — the Section 6 block. Props: position value,
   collateral bps, risk bps, computed capacity. Pure presentation, no
@@ -439,7 +439,7 @@ Policy Evaluation specifically, since it's called out:
 
 ---
 
-## 14. LedgerLine Anti-Patterns
+## 14. CortexRails Anti-Patterns
 
 - **Three-equal-weight stat cards for related numbers** — inappropriate
   specifically because Position Value, Collateral Factor, and Risk

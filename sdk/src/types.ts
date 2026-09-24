@@ -47,7 +47,7 @@ export type Position = {
 };
 
 /// Mirrors LedgerLineTypes.sol's `PolicyResponse` struct, as returned by
-/// Policy.canExecute. `permittedAmount` is the maximum LedgerLine
+/// Policy.canExecute. `permittedAmount` is the maximum CortexRails
 /// permits -- it is NOT clamped to the requested amount, and callers
 /// must enforce requestedAmount <= permittedAmount themselves.
 /// `reason` is a machine-readable bytes32 (e.g. "OK", "NO_CAPACITY"),

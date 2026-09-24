@@ -1,9 +1,14 @@
-# LedgerLine Core
+# CortexRails Protocol
 
-A reusable onchain policy primitive for tokenized real-world assets:
-one function, `canExecute()`, that any lending market, vault, or other
-money-moving contract calls before it acts, and that returns a
-deterministic ALLOW / LIMIT / REVIEW / BLOCK decision.
+**Policy infrastructure for autonomous finance.**
+
+A reusable onchain policy primitive for tokenized real-world assets and
+the autonomous agents/protocols acting on them: one function,
+`canExecute()`, that any lending market, vault, agent, or other
+money-moving consumer calls before it acts, and that returns a
+deterministic ALLOW / LIMIT / REVIEW / BLOCK decision. The underlying
+contracts, tests, and deployment retain their original `LedgerLine`
+technical names — see the Roadmap section below for the naming history.
 
 Built for the Arbitrum Open House Singapore online buildathon.
 First deep integration and proving ground: Robinhood Chain Stock Tokens.
@@ -19,9 +24,10 @@ per integration — especially once the underlying asset has a
 lifecycle (corporate actions, suspensions, redemptions) that a plain
 ERC-20 balance can't express.
 
-LedgerLine separates **"is this action allowed right now"** from
+CortexRails separates **"is this action allowed right now"** from
 **"how do we actually move the money."** The decision lives in one
-place; consuming contracts enforce it and hold the funds.
+place; consuming contracts (and, increasingly, autonomous agents that
+propose actions on their behalf) enforce it and hold the funds.
 
 ## The core primitive
 
@@ -87,6 +93,23 @@ contracts (Registry, Policy, LendingAdapter, VaultAdapter,
 TransferAdapter) through the same interfaces the Solidity consumers
 use, so an entirely different kind of consumer (an offchain script, a
 bot, another frontend) doesn't need to reimplement any of this.
+
+## The agent-facing intent layer
+
+CortexRails' framing as "policy infrastructure for autonomous finance"
+is backed by a real, minimal, non-AI translation layer around this same
+`canExecute()` — not a chatbot, not an LLM, not a second risk engine.
+`sdk/src/agent.ts` (`evaluateAgentIntent`, `suggestRetryIntent`) and
+`frontend/lib/agentIntent.ts` both resolve a structured intent
+(`{ asset, positionId, action, amount }`) into the real onchain call and
+decode the response back to human units — nothing else. The frontend's
+`/app` Policy Console includes a live "Agent Intent → Policy →
+Execution" demo section exercising the full loop: an over-capacity
+BORROW intent evaluates to `LIMIT`, a retry at the real permitted amount
+evaluates fresh to `ALLOW`, and only then does the same wallet-connected
+write flow every other action here uses actually execute. See
+`docs/ARCHITECTURE.md`'s "Agent-facing intent layer" section and
+`docs/DEMO.md` step 6 for the full walkthrough.
 
 ## Live on Robinhood Chain testnet
 
@@ -181,9 +204,15 @@ coverage, or production readiness.
 
 ## Roadmap
 
-**Naming disclosure:** LedgerLine is a working name for this
-buildathon submission, not an established or trademarked product
-name — treat it as provisional.
+**Naming disclosure:** the public product name is **CortexRails
+Protocol**; the underlying Solidity contracts, tests, deployment
+scripts, and the `@ledgerline/core` SDK package keep their original
+`LedgerLine` technical names unchanged, since renaming a
+deployed/importable identifier for branding alone would break real
+compatibility for no benefit. In short: **CortexRails Protocol —
+powered by the existing LedgerLine Core contracts.** Neither name is
+an established or trademarked product name — treat both as
+provisional for this buildathon submission.
 
 **Natural next additions, given the current, disclosed scope
 boundaries:**

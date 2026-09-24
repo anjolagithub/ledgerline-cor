@@ -1,9 +1,9 @@
 # Demo Walkthrough
 
-A judge-facing walkthrough of five core flows, run against the live
+A judge-facing walkthrough of six core flows, run against the live
 V2 deployment on Robinhood Chain testnet (`docs/DEPLOYMENTS.md`)
-through the frontend's Policy Console (`/app`) and Activity log
-(`/app/activity`).
+through the frontend's Policy Console (`/app`), its agent-intent demo
+section, and Activity log (`/app/activity`).
 
 > **Status of the hashes below:** Deposit, ALLOW borrow, and Vault
 > withdrawal each have a real transaction hash from actually
@@ -53,7 +53,7 @@ The `Borrowed` event appears in the Activity log.
 ## 3. LIMIT / reverted borrow
 
 Request a USDG amount that exceeds the position's effective capacity.
-`canExecute` returns `LIMIT` — LedgerLine never silently clamps a
+`canExecute` returns `LIMIT` — CortexRails never silently clamps a
 request — and the Policy Console shows the verdict and the actual
 maximum permitted amount before you'd even submit a transaction.
 
@@ -123,6 +123,58 @@ which hasn't been done through the live frontend as of this writing.
 Stated here plainly rather than filled with a fabricated hash.
 
 - Explorer: n/a — no transaction was ever broadcast for this step.
+
+## 6. Agent-facing intent demo (LIMIT → retry → ALLOW → execution)
+
+On the Policy Console (`/app`), the "Agent Intent → Policy → Execution"
+section below the main console demonstrates the same flow an autonomous
+agent would drive, using `frontend/lib/agentIntent.ts`'s
+`evaluateAgentIntent` -- a thin wrapper that resolves a structured intent
+(`{ asset: "TSLA", positionId, action: "BORROW", amount, assetOut: "USDG" }`)
+into the exact same `LedgerLinePolicy.canExecute()` read the Policy
+Console's own Borrow panel uses, then decodes the response back to human
+units. No capacity math happens in this wrapper; the decision, permitted
+amount, and reason are the real onchain answer.
+
+Flow demonstrated:
+
+1. **"Offchain agent intent"** — enter an amount exceeding the position's
+   effective capacity (e.g. `120000` against $112,000 capacity) and click
+   "Submit Intent." This panel is explicitly captioned "not yet read from
+   chain" — nothing here is a chain read yet.
+2. **"Live onchain policy result"** — the real `canExecute()` call
+   returns `LIMIT`, `permittedAmount = 112000`, and the real `reason`
+   constant `EXCEEDS_CAPACITY` (not the shorthand `CAPACITY_EXCEEDED`
+   sometimes used in prose — the actual `bytes32` constant is kept
+   verbatim, decoded to utf8, never remapped).
+3. **Retry** — clicking "Retry with permitted amount ($112000)" sets the
+   amount and performs a **fresh** `evaluateAgentIntent` call (never
+   assumes the earlier result) against the exact same live contract.
+4. **"Live onchain execution"** — now that a fresh evaluation returned
+   `ALLOW`, the Execute button appears, reusing the same
+   `useTransactionFlow`/`TransactionStatus` wallet-connected write flow
+   every other action in this app uses. No hash is shown, and nothing is
+   labeled a live onchain result, until `LendingAdapter.borrow()` is
+   actually signed, submitted, and confirmed.
+
+**No hash from this specific flow is recorded here** — same reasoning as
+steps 3 and 5: this document only records hashes from actions actually
+performed once, live, through the real frontend; the underlying
+`borrow()` call this demo executes is the identical one already recorded
+in step 2's hash above when a wallet runs this flow to a real `ALLOW`.
+
+**Manual verification step (not automated — see `sdk/test/agent.test.ts`
+for the automated unit coverage, which uses a stub client, not live
+RPC):** before recording or running this demo live, run
+`evaluateAgentIntent` once against the real deployment for an
+over-capacity BORROW and confirm its `decision`/`permittedAmount`/`reason`
+match a direct `LedgerLineClient.canExecute()` call for the same inputs.
+This is a one-time sanity check that the wrapper's translation logic
+hasn't drifted from the real contract, not a routine gate.
+
+- Explorer: n/a for the evaluation reads (they are `eth_call`s, not
+  transactions); the execution step's hash, once performed, is the same
+  kind of `Borrowed` event already covered in step 2 and the Activity log.
 
 ## Verifying independently
 

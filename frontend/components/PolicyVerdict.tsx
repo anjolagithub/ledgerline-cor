@@ -85,7 +85,7 @@ export function PolicyVerdict({
       </div>
 
       <div className="text-xs text-terminal-muted text-center">
-        LedgerLineLendingAdapter enforces this decision onchain.
+        The onchain lending adapter enforces this decision.
       </div>
     </div>
   );

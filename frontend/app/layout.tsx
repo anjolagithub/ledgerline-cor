@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "LedgerLine Core",
+  title: "CortexRails Protocol",
   description: "Programmable position, risk and policy layer for tokenized real-world assets.",
 };
 

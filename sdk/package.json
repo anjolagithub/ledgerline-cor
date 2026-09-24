@@ -1,7 +1,7 @@
 {
   "name": "@ledgerline/core",
   "version": "0.1.0",
-  "description": "TypeScript SDK for LedgerLine Core -- a typed viem client over the deployed Registry/Policy/LendingAdapter/VaultAdapter contracts on Robinhood Chain testnet.",
+  "description": "TypeScript SDK for CortexRails Protocol -- a typed viem client over the deployed Registry/Policy/LendingAdapter/VaultAdapter/TransferAdapter contracts on Robinhood Chain testnet.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -17,7 +17,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "node --import tsx --test test/**/*.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +27,7 @@
     "viem": "^2.0.0"
   },
   "devDependencies": {
+    "tsx": "^4.19.2",
     "typescript": "^7.0.2",
     "viem": "^2.56.5"
   }

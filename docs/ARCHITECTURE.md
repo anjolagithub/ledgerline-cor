@@ -231,3 +231,45 @@ currently configured.
 - `LedgerLineTransferAdapter` → `ILedgerLineRegistry`, `ILedgerLinePolicy`, `LedgerLineLendingAdapter` (concrete, for `transferPosition`)
 - `RobinhoodStockTokenAdapter` → `IAssetStateAdapter`, `IRobinhoodStockToken`, `AggregatorV3Interface` (Chainlink-shaped), OpenZeppelin `Ownable`
 - All shared types/enums/errors live in `contracts/src/interfaces/LedgerLineTypes.sol`
+
+## Agent-facing intent layer
+
+CortexRails Protocol's public framing is "policy infrastructure for
+autonomous finance" -- an autonomous agent or protocol should be able to
+propose an action and get the same deterministic decision a human-driven
+frontend gets, through the same policy core:
+
+```
+Autonomous Agent
+      ↓
+   Intent
+      ↓
+CortexRails Policy (LedgerLinePolicy.canExecute -- unmodified)
+      ↓
+ALLOW / LIMIT / REVIEW / BLOCK
+      ↓
+Financial Adapter (LendingAdapter / VaultAdapter / TransferAdapter)
+      ↓
+Onchain execution
+```
+
+**The agent proposes the action. CortexRails determines whether the
+action is permitted.** Two thin, non-authoritative wrappers exist purely
+to translate a structured intent into that same real `canExecute()` call
+-- neither one computes risk, capacity, or any economic result itself:
+
+- `sdk/src/agent.ts` (`evaluateAgentIntent`, `suggestRetryIntent`) --
+  resolves a human-readable intent (asset symbol, position, action,
+  amount) into the real onchain `canExecute` call via `LedgerLineClient`,
+  and decodes the response back to human units. The `reason` returned is
+  the real, unmodified `bytes32` constant the contract defines (e.g.
+  `EXCEEDS_CAPACITY`) -- never a second, invented reason vocabulary.
+- `frontend/lib/agentIntent.ts` -- the same translation, called directly
+  via wagmi against the live `LedgerLinePolicy` contract, powering the
+  Policy Console's "Agent Intent → Policy → Execution" demo section
+  (`frontend/components/AgentDemo.tsx`).
+
+Both wrappers are read-only translation only; the actual state-changing
+execution step goes through the exact same wallet-connected write flow
+(`useTransactionFlow` / `LendingAdapter.borrow()`) every other action on
+this frontend already uses -- no new signer, no new custody path.

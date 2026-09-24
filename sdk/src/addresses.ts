@@ -17,7 +17,7 @@ export type LedgerLineAddresses = {
 /// (debt-safety fix, commit 9fa2c38) and re-authorized as a releaser on
 /// LendingAdapter; the old instance
 /// (0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67) is abandoned -- see
-/// docs/DEPLOYMENTS.md. `transferAdapter` is LedgerLine's third
+/// docs/DEPLOYMENTS.md. `transferAdapter` is CortexRails' third
 /// reference consumer (Action.TRANSFER, commit 0dddd0d) and is also
 /// authorized as a releaser on LendingAdapter for its no-custody
 /// transferPosition() call. Re-derive these from a fresh broadcast

@@ -1,6 +1,6 @@
 # Integrations
 
-What LedgerLine actually talks to on Robinhood Chain testnet, sourced
+What CortexRails actually talks to on Robinhood Chain testnet, sourced
 from `contracts/src/RobinhoodStockTokenAdapter.sol`,
 `contracts/script/DeployTestnetReal.s.sol` /
 `DeployTestnetRealV2.s.sol`, and their tests. This document is careful
@@ -87,7 +87,7 @@ test using a 6-decimal mock (`MockUSDGLike`) in
 ## `oraclePaused()` behavior — summary
 
 Advisory per Robinhood's own documentation, not enforced onchain by
-the Stock Token contract itself. LedgerLine's adapter treats it as: if
+the Stock Token contract itself. CortexRails' adapter treats it as: if
 the call succeeds and reports `true`, block; if the call fails for any
 reason (including "not implemented," which is the real, observed case
 on this testnet's TSLA contract), don't revert the whole read — the
