@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="CortexRails Protocol">
+  <title>CortexRails Protocol</title>
+  <!-- One decision (canExecute) above three consumers (Borrow / Withdraw / Transfer).
+       64-unit grid: stroke 4 = 1px at 16px. Spokes start on the disc rim (0deg, +/-45deg)
+       so the root has clean notches. Box mid y=30.75 (deliberate ~1.25u optical lift). -->
+  <g stroke="#ff7058" stroke-width="4" stroke-linecap="round" fill="none">
+    <line x1="25.64" y1="25.86" x2="14" y2="45.5"/>
+    <line x1="32" y1="28.5" x2="32" y2="45.5"/>
+    <line x1="38.36" y1="25.86" x2="50" y2="45.5"/>
+  </g>
+  <g fill="#ff7058">
+    <circle cx="32" cy="19.5" r="9"/>
+    <circle cx="14" cy="45.5" r="5.5"/>
+    <circle cx="32" cy="45.5" r="5.5"/>
+    <circle cx="50" cy="45.5" r="5.5"/>
+  </g>
+</svg>

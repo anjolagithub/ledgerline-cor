@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandMark } from "@/components/BrandMark";
 import { LandingPolicyDemo } from "@/components/LandingPolicyDemo";
 
 const REPO = "https://github.com/anjolagithub/ledgerline-cor";
@@ -141,7 +142,7 @@ export default function Landing() {
   return (
     <main className="site-shell mx-auto flex max-w-7xl flex-col px-4 sm:px-6 md:px-10">
       <nav className="glass-nav sticky top-3 z-50 mx-auto flex min-h-14 w-full items-center justify-between rounded-2xl px-3 py-2.5 sm:top-4 sm:min-h-16 sm:px-4 sm:py-3 md:px-5" aria-label="Primary navigation">
-        <Link href="/" className="flex min-w-0 items-center gap-3 font-semibold tracking-tight"><span className="brand-mark" aria-hidden="true"><span className="brand-mark-line brand-mark-line-a" /><span className="brand-mark-line brand-mark-line-b" /><span className="brand-mark-line brand-mark-line-c" /></span><span className="truncate text-[13px] sm:text-base">CortexRails</span><span className="hidden rounded-full border border-terminal-border/80 bg-terminal-bg/30 px-2.5 py-1 font-mono text-[9px] font-normal tracking-normal text-terminal-muted sm:inline"><span className="mr-1.5 text-terminal-accent">●</span>Protocol</span></Link>
+        <Link href="/" className="flex min-w-0 items-center gap-3 font-semibold tracking-tight"><BrandMark size={32} /><span className="truncate text-[13px] sm:text-base">CortexRails</span><span className="hidden rounded-full border border-terminal-border/80 bg-terminal-bg/30 px-2.5 py-1 font-mono text-[9px] font-normal tracking-normal text-terminal-muted sm:inline"><span className="mr-1.5 text-terminal-accent">●</span>Protocol</span></Link>
         <div className="flex items-center gap-2 text-xs text-terminal-muted md:gap-5">
           <div className="hidden items-center gap-5 lg:flex">
             {navLinks.map(([href, label]) => <a key={href} href={href} className="nav-link transition-colors hover:text-terminal-text">{label}</a>)}
@@ -338,7 +339,7 @@ export default function Landing() {
         <div className="flex flex-wrap gap-3"><Link href="/app" className="primary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] text-terminal-accent-fg">Explore the policy engine →</Link><a href={REPO} target="_blank" rel="noreferrer" className="secondary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] transition-colors hover:bg-terminal-surface">View on GitHub</a></div>
       </section>
 
-      <footer className="flex flex-col gap-5 border-t border-terminal-border py-7 text-xs text-terminal-muted sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><span className="brand-mark brand-mark-small" aria-hidden="true"><span className="brand-mark-line brand-mark-line-a" /><span className="brand-mark-line brand-mark-line-b" /><span className="brand-mark-line brand-mark-line-c" /></span><span>CortexRails Protocol</span></div><div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[.12em]"><a href="#primitive" className="transition-colors hover:text-terminal-text">Primitive</a><a href="#deployment" className="transition-colors hover:text-terminal-text">Deployment</a><a href="#developer" className="transition-colors hover:text-terminal-text">Developers</a><a href={REPO} target="_blank" rel="noreferrer" className="transition-colors hover:text-terminal-text">GitHub</a><span className="text-terminal-border">Testnet</span></div></footer>
+      <footer className="flex flex-col gap-5 border-t border-terminal-border py-7 text-xs text-terminal-muted sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><BrandMark size={20} /><span>CortexRails Protocol</span></div><div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[.12em]"><a href="#primitive" className="transition-colors hover:text-terminal-text">Primitive</a><a href="#deployment" className="transition-colors hover:text-terminal-text">Deployment</a><a href="#developer" className="transition-colors hover:text-terminal-text">Developers</a><a href={REPO} target="_blank" rel="noreferrer" className="transition-colors hover:text-terminal-text">GitHub</a><span className="text-terminal-border">Testnet</span></div></footer>
     </main>
   );
 }
