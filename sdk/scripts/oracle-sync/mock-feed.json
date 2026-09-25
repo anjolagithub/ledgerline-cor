@@ -1,0 +1,7 @@
+{
+  "_note": "MOCK price feed for scripts/oracle-sync.ts -- not a real oracle. price is a human-unit decimal string. updatedAt is unix seconds, or \"now\" (mock-only convenience: treated as the current time). Override per run with --feed-price / --compliance-flag instead of editing this file.",
+  "asset": "TSLA",
+  "price": "364.27",
+  "updatedAt": "now",
+  "complianceFlag": false
+}
