@@ -17,7 +17,8 @@ import {
     REASON_SUSPENDED,
     REASON_MATURING,
     REASON_REDEEMABLE,
-    REASON_REDEEMED
+    REASON_REDEEMED,
+    REASON_ABOVE_MAINTENANCE
 } from "./interfaces/LedgerLineTypes.sol";
 import {ILedgerLineRegistry} from "./interfaces/ILedgerLineRegistry.sol";
 import {IPositionEngine} from "./interfaces/IPositionEngine.sol";
@@ -98,6 +99,24 @@ contract LedgerLinePolicy is ILedgerLinePolicy, Ownable {
                 permittedAmount: position.rawBalance,
                 reason: REASON_OK
             });
+        }
+
+        // LIQUIDATE asks "is this position under-collateralized?". Policy
+        // stays debt-agnostic (debt lives in the lending market, never in
+        // Registry), so for this action ONLY, `amount` is the position's
+        // outstanding debt, supplied by the caller -- the future
+        // liquidation consumer passes lendingAdapter.debt(user), the same
+        // trust pattern BORROW already relies on for cumulative debt.
+        // Eligible iff debt is strictly above the maintenance threshold
+        // (value x collateral factor, computed by the Stylus RiskEngine).
+        // Lifecycle is already confirmed ACTIVE above. No consumer adapter
+        // exists yet -- same as TRANSFER's branch preceded its adapter.
+        if (action == Action.LIQUIDATE) {
+            uint256 value = positionEngine.computePositionValue(position.rawBalance, asset.price, asset.multiplier);
+            if (riskEngine.isLiquidatable(value, asset.collateralFactorBps, amount)) {
+                return PolicyResponse({decision: Decision.ALLOW, permittedAmount: amount, reason: REASON_OK});
+            }
+            return PolicyResponse({decision: Decision.BLOCK, permittedAmount: 0, reason: REASON_ABOVE_MAINTENANCE});
         }
 
         uint256 positionValue = positionEngine.computePositionValue(

@@ -27,12 +27,14 @@ function canExecute(
 - **`action`** — one of `BORROW`, `WITHDRAW`, `TRANSFER`,
   `INCREASE_LEVERAGE`, `LIQUIDATE` (`Action` enum,
   `LedgerLineTypes.sol`). `BORROW`, `WITHDRAW`, and `TRANSFER` all have
-  real behavior today; `INCREASE_LEVERAGE` and `LIQUIDATE` exist in the
-  enum but have no wired logic anywhere in the contracts.
+  real behavior today. `LIQUIDATE` has a policy branch in the repo (see
+  below), but it isn't deployed and has no consumer adapter yet.
+  `INCREASE_LEVERAGE` exists in the enum only.
 - **`amount`** — the amount the caller wants to execute, as an
   18-decimal fixed-point internal unit, regardless of any real token's
   actual decimals. This convention is enforced by callers, not by
-  Policy itself.
+  Policy itself. **Exception: for `LIQUIDATE`, `amount` is the
+  position's outstanding debt**, not an amount to execute (see below).
 
 ## Return value
 
@@ -193,6 +195,53 @@ changes hands — there is nothing to recompute. Tested directly:
 `LedgerLineTransferAdapter.t.sol::test_transferBlockedWithAnyOutstandingDebt`
 (even $1 of debt blocks any transfer amount) and
 `test_transferAllowedWithZeroDebt`.
+
+## LIQUIDATE behavior (implemented and tested, not deployed)
+
+```solidity
+if (action == Action.LIQUIDATE) {
+    uint256 value = positionEngine.computePositionValue(position.rawBalance, asset.price, asset.multiplier);
+    if (riskEngine.isLiquidatable(value, asset.collateralFactorBps, amount)) {
+        return PolicyResponse({decision: ALLOW, permittedAmount: amount, reason: REASON_OK});
+    }
+    return PolicyResponse({decision: BLOCK, permittedAmount: 0, reason: REASON_ABOVE_MAINTENANCE});
+}
+```
+
+Asks whether a position is under-collateralized. Liquidation eligibility
+depends on debt, but `Policy` stays debt-agnostic: debt lives in the
+lending market, never in Registry. So for this action only, **`amount`
+is the position's outstanding debt**, supplied by the caller. A future
+liquidation consumer would pass `lendingAdapter.debt(user)`, the same
+trust pattern BORROW already relies on for cumulative debt.
+
+The maths lives in the Stylus `RiskEngine`
+(`stylus/risk-engine/src/lib.rs`):
+
+- `computeLiquidationThreshold(value, collateralFactorBps)` =
+  `value × collateralFactorBps / 10000`. This is the **maintenance
+  margin**, and it deliberately leaves out the risk adjustment.
+- `isLiquidatable(value, collateralFactorBps, debt)` = `debt > threshold`.
+  Strictly greater: debt exactly at the threshold is **not** liquidatable.
+
+Borrowing capacity (the initial margin) is `value × CF × risk
+adjustment`, so the maintenance threshold is always at or above it.
+A position borrowed to full capacity is never immediately liquidatable,
+and the risk adjustment is the buffer between the two. At the testnet
+configuration (70% CF, 80% risk adjustment) you can borrow up to 56%
+loan-to-value and become liquidatable above 70%.
+
+The lifecycle short-circuit still applies first, so a non-`ACTIVE`
+asset blocks liquidation too. Zero debt is never liquidatable.
+
+**Status:** code and tests only. There is no liquidation consumer
+adapter yet, the same way TRANSFER's policy branch preceded its adapter.
+The deployed `LedgerLinePolicy` and Stylus `RiskEngine` on testnet are
+immutable and don't contain this branch. Tests:
+`contracts/test/LedgerLineLiquidate.t.sol` (above, below, and exactly at
+the boundary; non-ACTIVE; a real full-capacity borrow that becomes
+liquidatable after a price drop; BORROW, WITHDRAW, and TRANSFER
+decisions unchanged) and the `RiskEngine` unit tests and proptests.
 
 ## Why BORROW, WITHDRAW, and TRANSFER are different policies
 

@@ -25,4 +25,20 @@ contract StubRiskEngine is IRiskEngine {
     {
         return (positionValue * collateralFactorBps / 10000) * riskAdjustmentBps / 10000;
     }
+
+    function computeLiquidationThreshold(uint256 positionValue, uint256 collateralFactorBps)
+        public
+        pure
+        returns (uint256)
+    {
+        return positionValue * collateralFactorBps / 10000;
+    }
+
+    function isLiquidatable(uint256 positionValue, uint256 collateralFactorBps, uint256 debt)
+        external
+        pure
+        returns (bool)
+    {
+        return debt > computeLiquidationThreshold(positionValue, collateralFactorBps);
+    }
 }

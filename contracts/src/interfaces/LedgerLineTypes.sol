@@ -71,3 +71,6 @@ bytes32 constant REASON_SUSPENDED = "SUSPENDED";
 bytes32 constant REASON_MATURING = "MATURING";
 bytes32 constant REASON_REDEEMABLE = "REDEEMABLE";
 bytes32 constant REASON_REDEEMED = "REDEEMED";
+// LIQUIDATE only: the position's debt is at or below its maintenance
+// threshold, so it is healthy and not eligible for liquidation.
+bytes32 constant REASON_ABOVE_MAINTENANCE = "ABOVE_MAINTENANCE";

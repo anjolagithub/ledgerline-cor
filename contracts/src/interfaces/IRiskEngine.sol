@@ -14,4 +14,18 @@ interface IRiskEngine {
         uint256 collateralFactorBps,
         uint256 riskAdjustmentBps
     ) external view returns (uint256 borrowingCapacity);
+
+    /// @notice Maintenance margin: positionValue * collateralFactorBps / 10000.
+    /// Deliberately excludes the risk adjustment, so it is always >= the
+    /// borrowing capacity above.
+    function computeLiquidationThreshold(uint256 positionValue, uint256 collateralFactorBps)
+        external
+        view
+        returns (uint256 liquidationThreshold);
+
+    /// @notice True iff debt is strictly above the maintenance threshold.
+    function isLiquidatable(uint256 positionValue, uint256 collateralFactorBps, uint256 debt)
+        external
+        view
+        returns (bool);
 }
