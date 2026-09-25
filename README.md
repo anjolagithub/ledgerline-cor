@@ -190,9 +190,16 @@ matter most:
   TSLA data, but it is not wired into the live decision path, and no
   Chainlink tokenized-equity feed exists for Robinhood Chain testnet
   (details in [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)).
-- **No `repay()`.** Debt is permanent once borrowed, so a position that
-  has borrowed can never pass TransferAdapter's debt check again, and
-  VaultAdapter only lets it withdraw down to what still covers the debt.
+- **`repay()` is implemented, not deployed.** On the live testnet, debt
+  is permanent once borrowed, so a position that has borrowed can never
+  pass TransferAdapter's debt check again, and VaultAdapter only lets it
+  withdraw down to what still covers the debt. `repay()` exists in the
+  repo's `LedgerLineLendingAdapter` and is tested, but the deployed
+  adapter is immutable and doesn't have it.
+- **LIQUIDATE is implemented, not deployed.** The Policy branch and the
+  RiskEngine maintenance-threshold maths exist in the repo and are
+  tested, but the deployed Policy and RiskEngine don't contain them,
+  and no liquidation consumer adapter exists yet.
 - **Policy is debt-agnostic.** For BORROW, `canExecute()` compares only
   the new request to capacity. Consumers must add existing debt
   themselves, as `LedgerLineLendingAdapter` does.
@@ -326,15 +333,25 @@ tokens, and each is now regression-tested:
 
 Natural next additions, given the current, disclosed scope boundaries:
 
-- A `repay()` function on `LedgerLineLendingAdapter`. Debt is currently
-  permanent once borrowed.
-- A fourth consumer action, for example `Action.LIQUIDATE`, already
-  reserved in the `Action` enum
-  (`contracts/src/interfaces/LedgerLineTypes.sol`) with no consumer or
-  `Policy` branch yet. TRANSFER's addition needed zero changes to
-  `Registry` or either Stylus engine and exactly one new branch in
-  `LedgerLinePolicy`, the same pattern a LIQUIDATE consumer would
-  follow.
+- **`repay()` on `LedgerLineLendingAdapter`: implemented, not
+  deployed.** It takes an 18-decimal amount and rounds the USDG pulled
+  up, so a repayment never cancels more debt than it pays for. Lifecycle
+  doesn't gate it, so borrowers can always repay. Tests:
+  `contracts/test/LedgerLineRepay.t.sol`. Going live means redeploying
+  the lending adapter.
+- **`Action.LIQUIDATE`: implemented, not deployed.** It has a
+  `LedgerLinePolicy` branch where `amount` is the caller-supplied
+  outstanding debt, so Policy stays debt-agnostic. A position becomes
+  eligible when its debt is strictly above the maintenance threshold
+  (`value × collateralFactorBps`), which the Stylus `RiskEngine`
+  computes. Details in [`docs/POLICY.md`](docs/POLICY.md); tests:
+  `contracts/test/LedgerLineLiquidate.t.sol`. What's still missing is a
+  liquidation consumer adapter and a redeploy of Policy and RiskEngine.
+- **Oracle-to-Registry sync.** `sdk/scripts/oracle-sync.ts` reads a
+  mock price feed, not a real oracle, and by default only prints the
+  lifecycle transition it would make. It sends a transaction only when
+  you pass `--execute` with the Registry owner key and confirm
+  interactively, and nothing runs it against the live Registry today.
 
 ## Naming
 
