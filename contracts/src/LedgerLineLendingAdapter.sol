@@ -32,7 +32,10 @@ import {ILedgerLinePolicy} from "./interfaces/ILedgerLinePolicy.sol";
 /// LIMIT semantics (locked): reject-and-resubmit. A LIMIT-range request
 /// reverts; it is never silently capped.
 ///
-/// Scope (locked, Phase 4): deposit and borrow only.
+/// Scope: deposit, borrow, and repay. repay() was added after Phase 4 to
+/// close the "debt is permanent" gap -- it only ever reduces debt, so it
+/// is deliberately not policy-gated (blocking repayment while an asset is
+/// SUSPENDED would trap borrowers in debt rather than reduce risk).
 contract LedgerLineLendingAdapter is Ownable {
     using SafeERC20 for IERC20;
 
@@ -50,6 +53,7 @@ contract LedgerLineLendingAdapter is Ownable {
     event Borrowed(address indexed user, uint256 amount, uint256 newDebt);
     event Released(address indexed user, uint256 amount, uint256 newRawBalance, address indexed releaser);
     event ReleaserUpdated(address indexed releaser, bool authorized);
+    event Repaid(address indexed user, uint256 amount, uint256 newDebt);
     event PositionTransferred(
         address indexed from, address indexed to, uint256 amount, uint256 newFromRawBalance, uint256 newToRawBalance
     );
@@ -60,6 +64,8 @@ contract LedgerLineLendingAdapter is Ownable {
     error ExceedsPermittedAmount(uint256 wouldOweTotal, uint256 permittedAmount);
     error NotAuthorizedReleaser(address caller);
     error InsufficientPosition(uint256 requested, uint256 available);
+    error NoDebt();
+    error RepayExceedsDebt(uint256 amount, uint256 currentDebt);
 
     constructor(
         address initialOwner,
@@ -165,6 +171,19 @@ contract LedgerLineLendingAdapter is Ownable {
         return internalAmount18 * (10 ** (borrowTokenDecimals - 18));
     }
 
+    /// @dev Same conversion as _toTokenAmount, but rounds UP when the
+    /// borrow token has fewer than 18 decimals. Used only when pulling
+    /// tokens IN (repay), so the tokens received are never worth less
+    /// than the internal debt they cancel -- e.g. repaying 1 wei of
+    /// 18-decimal debt against 6-decimal USDG pulls 1 USDG unit, not 0.
+    function _toTokenAmountRoundUp(uint256 internalAmount18) internal view returns (uint256) {
+        if (borrowTokenDecimals < 18) {
+            uint256 scale = 10 ** (18 - borrowTokenDecimals);
+            return (internalAmount18 + scale - 1) / scale;
+        }
+        return _toTokenAmount(internalAmount18);
+    }
+
     // ---------------------------------------------------------------
     // Collateral custody
     // ---------------------------------------------------------------
@@ -219,5 +238,27 @@ contract LedgerLineLendingAdapter is Ownable {
         borrowToken.safeTransfer(msg.sender, _toTokenAmount(amount));
 
         emit Borrowed(msg.sender, amount, wouldOweTotal);
+    }
+
+    // ---------------------------------------------------------------
+    // Debt repayment
+    // ---------------------------------------------------------------
+    /// @notice Repays `amount` of the caller's own debt. `amount` is in
+    /// the same 18-decimal internal units as borrow() and debt(); the
+    /// borrow token pulled is scaled to its real decimals, rounded up.
+    /// Caller must approve at least _toTokenAmountRoundUp(amount) first.
+    function repay(uint256 amount) external {
+        uint256 currentDebt = debt[msg.sender];
+        if (currentDebt == 0) revert NoDebt();
+        if (amount > currentDebt) revert RepayExceedsDebt(amount, currentDebt);
+
+        // Effects before the external call; the transfer reverting undoes
+        // this atomically.
+        uint256 newDebt = currentDebt - amount;
+        debt[msg.sender] = newDebt;
+
+        borrowToken.safeTransferFrom(msg.sender, address(this), _toTokenAmountRoundUp(amount));
+
+        emit Repaid(msg.sender, amount, newDebt);
     }
 }
