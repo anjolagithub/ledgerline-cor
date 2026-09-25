@@ -9,6 +9,11 @@
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./agentkit": {
+      "types": "./dist/integrations/agentkit.d.ts",
+      "require": "./dist/integrations/agentkit.js",
+      "default": "./dist/integrations/agentkit.js"
     }
   },
   "files": [
@@ -25,11 +30,23 @@
   "author": "",
   "license": "ISC",
   "peerDependencies": {
-    "viem": "^2.0.0"
+    "@coinbase/agentkit": "^0.10.4",
+    "viem": "^2.0.0",
+    "zod": "^3.25.76"
+  },
+  "peerDependenciesMeta": {
+    "@coinbase/agentkit": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@coinbase/agentkit": "^0.10.4",
     "tsx": "^4.19.2",
     "typescript": "^7.0.2",
-    "viem": "^2.56.5"
+    "viem": "^2.56.5",
+    "zod": "^3.25.76"
   }
 }

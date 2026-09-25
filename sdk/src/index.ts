@@ -12,5 +12,11 @@ export {
   LedgerLineVaultAdapterAbi,
   LedgerLineTransferAdapterAbi,
 } from "./abi";
-export { evaluateAgentIntent, suggestRetryIntent, KNOWN_AGENT_ASSETS, UnknownAgentAssetError } from "./agent";
+export {
+  evaluateAgentIntent,
+  suggestRetryIntent,
+  registerAgentAsset,
+  KNOWN_AGENT_ASSETS,
+  UnknownAgentAssetError,
+} from "./agent";
 export type { AgentAction, AgentDecision, AgentIntent, AgentPolicyResult, AgentPolicyClient } from "./agent";

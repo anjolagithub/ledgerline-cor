@@ -28,12 +28,43 @@ const DECISION_LABELS = ["ALLOW", "LIMIT", "REVIEW", "BLOCK"] as const;
 export type AgentDecision = (typeof DECISION_LABELS)[number];
 
 /// A local, offchain DISPLAY lookup only -- `LedgerLineRegistry` has no
-/// symbol->assetId read of its own, and this is not risk math. Covers
-/// exactly the one asset this deployment configures (assetId 1, TSLA).
-/// Throws `UnknownAgentAssetError` for anything else rather than guessing.
+/// symbol->assetId read of its own, and this is not risk math. Seeded
+/// with exactly the one asset THIS deployment currently has configured
+/// (assetId 1, TSLA) -- not because the underlying contracts are
+/// single-asset. `Policy.canExecute`, `LedgerLineRegistry.getAssetState`/
+/// `getPosition`, and every adapter's write path already take `assetId`
+/// as a real parameter throughout (see LedgerLineRegistry.sol,
+/// LedgerLinePolicy.sol) -- the primitive itself is multi-asset. What
+/// this map can't do is configure a NEW asset onchain: that is an
+/// `onlyOwner` call on the deployed Registry (see
+/// LedgerLineRegistry.sol's `configureAsset`-style admin functions),
+/// which needs the Registry owner's key -- something no SDK call can
+/// or should do on a caller's behalf. Use `registerAgentAsset` below
+/// once a second asset is actually configured onchain, rather than
+/// editing this object directly (keeps the mutation in one auditable
+/// place with the same validation every time).
 export const KNOWN_AGENT_ASSETS: Record<string, bigint> = {
   TSLA: 1n,
 };
+
+/// Registers an additional symbol -> assetId mapping for
+/// `evaluateAgentIntent`/`suggestRetryIntent` to resolve, once that
+/// assetId is actually configured on the deployed Registry (this
+/// function does not configure it -- it only teaches this SDK's local,
+/// offchain display lookup about an assetId that already exists
+/// onchain). Rejects redefining an existing symbol to a different
+/// assetId outright, rather than silently overwriting it.
+export function registerAgentAsset(symbol: string, assetId: bigint): void {
+  const existing = KNOWN_AGENT_ASSETS[symbol];
+  if (existing !== undefined && existing !== assetId) {
+    throw new Error(
+      `registerAgentAsset: "${symbol}" is already registered as assetId ${existing} -- refusing to silently ` +
+        `redefine it to ${assetId}. Use a different symbol, or confirm this is intentional and remove the ` +
+        `existing entry first.`
+    );
+  }
+  KNOWN_AGENT_ASSETS[symbol] = assetId;
+}
 
 export class UnknownAgentAssetError extends Error {
   constructor(asset: string) {

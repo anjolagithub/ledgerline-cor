@@ -4,6 +4,7 @@ import { stringToHex } from "viem";
 import {
   evaluateAgentIntent,
   suggestRetryIntent,
+  registerAgentAsset,
   KNOWN_AGENT_ASSETS,
   UnknownAgentAssetError,
   type AgentIntent,
@@ -88,4 +89,24 @@ test("suggestRetryIntent returns an amount-adjusted intent only on LIMIT", async
     intent
   );
   assert.equal(suggestRetryIntent(intent, allowResult), undefined);
+});
+
+test("registerAgentAsset lets evaluateAgentIntent resolve a SECOND assetId end-to-end -- proves the intent " +
+     "layer is not hardcoded to TSLA/assetId 1, only seeded with it", async () => {
+  registerAgentAsset("AAPL", 2n);
+  const client = stubClient({ decision: Decision.ALLOW, permittedAmount: 50_000n * ONE, reason: stringToHex("OK", { size: 32 }) });
+  const intent: AgentIntent = { asset: "AAPL", positionId: 7n, action: "BORROW", amount: "50000" };
+
+  const result = await evaluateAgentIntent(client, intent);
+
+  assert.deepEqual(client.calls[0], [7n, Action.BORROW, 50_000n * ONE, 2n]);
+  assert.equal(result.assetId, 2n);
+  assert.equal(result.decision, "ALLOW");
+});
+
+test("registerAgentAsset refuses to silently redefine an already-registered symbol to a different assetId", () => {
+  assert.throws(() => registerAgentAsset("TSLA", 99n), /already registered as assetId 1/);
+  // Re-registering the SAME assetId is a no-op, not an error.
+  registerAgentAsset("TSLA", KNOWN_AGENT_ASSETS.TSLA);
+  assert.equal(KNOWN_AGENT_ASSETS.TSLA, 1n);
 });

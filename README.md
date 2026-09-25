@@ -139,6 +139,20 @@ The frontend's `/app` Policy Console has a live "Agent Intent → Policy
 → Execution" section that runs this loop against the deployed Policy
 with the connected wallet's real position (`docs/DEMO.md` step 6).
 
+**`@ledgerline/core/agentkit`** wires the same `evaluateAgentIntent()`
+call into a real [Coinbase AgentKit](https://github.com/coinbase/agentkit)
+`ActionProvider` (`cortexRailsActionProvider()`), built against
+AgentKit's actual published plugin interface. It sits downstream of
+AgentKit's own wallet-level custody/signing controls: AgentKit decides
+whether its wallet will sign at all, CortexRails decides whether this
+specific RWA action should be attempted, refusing outright (no
+transaction sent) on `BLOCK` or `REVIEW`. See `sdk/README.md`'s
+"Coinbase AgentKit integration" section for what this has and hasn't
+been verified against — its pre-check and transaction-building logic
+has real test coverage; a live end-to-end run against an actual
+AgentKit wallet/agent has not happened yet, for lack of an AgentKit
+account in this environment.
+
 ## Live deployment
 
 **Robinhood Chain testnet, chain ID 46630.** The current testnet
