@@ -15,7 +15,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 /// Demonstrates the pipeline AGENT INTENT -> POLICY EVALUATION -> ONCHAIN
 /// DECISION -> EXECUTION. Fixed to Action.BORROW (matching the required
 /// demo flow exactly: request past capacity -> LIMIT -> retry at the
-/// permitted amount -> ALLOW -> real execution) -- WITHDRAW/TRANSFER are
+/// permitted amount -> ALLOW -> real execution) — WITHDRAW/TRANSFER are
 /// equally supported by evaluateAgentIntent/the SDK, just not exercised
 /// by this specific demo. Reuses PolicyEquation/PolicyVerdict/
 /// TransactionStatus/useTransactionFlow unmodified; the only new UI here
@@ -103,23 +103,23 @@ export function AgentDemo() {
           Agent Intent → Policy → Execution
         </h2>
         <p className="mt-2 max-w-xl text-sm text-terminal-muted">
-          The agent proposes the action. CortexRails determines whether it&apos;s permitted -- through the exact
+          The agent proposes the action. CortexRails determines whether it&apos;s permitted — through the exact
           same onchain <code className="font-mono text-terminal-text">canExecute()</code> read the Policy Console
           above uses, not a separate simulation.
         </p>
       </div>
 
       <div className="space-y-6">
-        <div className="rounded border border-dashed border-terminal-border bg-terminal-bg p-4">
+        <div className="form-card border-dashed">
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wide text-terminal-muted">Offchain agent intent</span>
+            <span className="field-label mb-0">Offchain agent intent</span>
             <span className="font-mono text-[10px] text-terminal-muted">not yet read from chain</span>
           </div>
-          <pre className="overflow-x-auto font-mono text-xs leading-6 text-terminal-text">
+          <pre className="overflow-x-auto rounded-[.6rem] border border-terminal-border bg-terminal-bg p-3 font-mono text-xs leading-6 text-terminal-text">
             {JSON.stringify(
               {
                 asset: intent.asset,
-                positionId: address ?? "-- connect a wallet --",
+                positionId: address ?? "— connect a wallet —",
                 action: intent.action,
                 amount: intent.amount,
                 assetOut: intent.assetOut,
@@ -128,40 +128,42 @@ export function AgentDemo() {
               2
             )}
           </pre>
-          <label htmlFor="agent-amount" className="mt-3 block text-xs uppercase tracking-wide text-terminal-muted">
+          <label htmlFor="agent-amount" className="field-label mt-3">
             Amount (USDG)
           </label>
-          <input
-            id="agent-amount"
-            type="number"
-            min="0"
-            step="1"
-            value={amount}
-            onChange={(e) => {
-              setAmount(e.target.value);
-              setResult(undefined);
-            }}
-            className="mt-2 w-full rounded border border-terminal-border bg-terminal-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-terminal-accent"
-          />
+          <div className="field-prefix-group">
+            <input
+              id="agent-amount"
+              type="number"
+              min="0"
+              step="1"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setResult(undefined);
+              }}
+              className="field-input"
+            />
+          </div>
           <button
             type="button"
             disabled={!address || !amount || evaluating}
             onClick={() => handleEvaluate(amount)}
-            className="mt-3 w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90 disabled:opacity-40"
+            className="form-action form-action-primary mt-3"
           >
             {evaluating ? "Evaluating…" : "Submit Intent"}
           </button>
-          {!address && <p className="mt-2 text-xs text-terminal-muted">Connect a wallet to submit an intent.</p>}
+          {!address && <p className="field-hint">Connect a wallet to submit an intent.</p>}
         </div>
 
         {evalError && (
-          <div className="border border-terminal-border bg-terminal-bg px-4 py-4 text-sm text-decision-block">{evalError}</div>
+          <div className="rounded-[.75rem] border border-terminal-border bg-terminal-bg px-4 py-4 text-sm text-decision-block">{evalError}</div>
         )}
 
         {result && result.requestedAmount === amount && (
-          <div className="rounded-lg border-2 border-terminal-border bg-terminal-surface p-6">
+          <div className="form-card">
             <div className="mb-4 flex items-center justify-between">
-              <span className="text-xs uppercase tracking-wide text-terminal-muted font-medium">
+              <span className="form-card-title mb-0">
                 Live onchain policy result
               </span>
               <span className="font-mono text-[10px] text-terminal-muted">canExecute()</span>
@@ -182,7 +184,7 @@ export function AgentDemo() {
                   setAmount(retryIntent.amount);
                   handleEvaluate(retryIntent.amount);
                 }}
-                className="mt-4 w-full rounded border border-terminal-border px-3 py-2 text-xs uppercase tracking-wide hover:bg-terminal-bg"
+                className="form-action form-action-secondary mt-4"
               >
                 Retry with permitted amount (${retryIntent.amount})
               </button>
@@ -191,12 +193,12 @@ export function AgentDemo() {
         )}
 
         {canExecute && (
-          <div className="rounded border border-terminal-border bg-terminal-bg p-4">
-            <div className="mb-3 text-xs uppercase tracking-wide text-terminal-muted">Live onchain execution</div>
+          <div className="form-card">
+            <div className="form-card-title">Live onchain execution</div>
             {tx.status === "wrong-network" ? (
               <button
                 onClick={tx.switchToCorrectNetwork}
-                className="w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
+                className="form-action form-action-primary"
               >
                 Switch Network
               </button>
@@ -212,7 +214,7 @@ export function AgentDemo() {
                     args: [parseUnits(amount, 18)],
                   })
                 }
-                className="w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90 disabled:opacity-40"
+                className="form-action form-action-primary"
               >
                 Execute Borrow
               </button>

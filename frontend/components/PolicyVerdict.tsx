@@ -4,7 +4,7 @@ import { DECISION_LABELS, LIFECYCLE_LABELS, formatUnits18 } from "@/lib/contract
 type PolicyResponse = { decision: number; permittedAmount: bigint; reason: string } | undefined;
 
 /// Pure presentation component. Consumes the canExecute response passed
-/// down from the caller -- does not call canExecute itself, per
+/// down from the caller — does not call canExecute itself, per
 /// DESIGN_SPEC.md Section 11.
 export function PolicyVerdict({
   requestedAmount,
@@ -58,7 +58,7 @@ export function PolicyVerdict({
         ) : (
           <div className="flex items-center gap-2 text-sm text-decision-limit">
             <TriangleAlert size={14} className="shrink-0" />
-            Lifecycle: {lifecycle !== undefined ? LIFECYCLE_LABELS[lifecycle] : "--"} -- all actions
+            Lifecycle: {lifecycle !== undefined ? LIFECYCLE_LABELS[lifecycle] : "—"} — all actions
             blocked
           </div>
         )}
@@ -76,7 +76,7 @@ export function PolicyVerdict({
       )}
 
       <div className="border-t border-terminal-border pt-3 text-center">
-        <div className={`text-4xl font-bold ${colorClass}`}>{decisionLabel ?? "--"}</div>
+        <div className={`text-4xl font-bold ${colorClass}`}>{decisionLabel ?? "—"}</div>
         {(decisionLabel === "LIMIT" || decisionLabel === "BLOCK") && response && (
           <div className="mt-1 text-xs text-terminal-muted">
             Maximum permitted ${formatUnits18(response.permittedAmount)}

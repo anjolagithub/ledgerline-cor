@@ -171,7 +171,7 @@ export function describeRow(row: ActivityRow, stockSymbol: string): { label: str
 }
 
 export function formatRelativeTime(timestamp: bigint | undefined): string {
-  if (timestamp === undefined) return "--";
+  if (timestamp === undefined) return "—";
   const seconds = Math.floor(Date.now() / 1000) - Number(timestamp);
   if (seconds < 5) return "just now";
   if (seconds < 60) return `${seconds}s ago`;

@@ -11,7 +11,7 @@ export function ConnectButton() {
     return (
       <button
         onClick={() => disconnect()}
-        className="rounded border border-terminal-border px-3 py-1.5 text-xs uppercase tracking-wide text-terminal-muted hover:text-terminal-text"
+        className="form-action form-action-secondary w-auto px-4"
       >
         {address.slice(0, 6)}...{address.slice(-4)}
       </button>
@@ -21,7 +21,7 @@ export function ConnectButton() {
   return (
     <button
       onClick={() => connect({ connector: connectors[0] })}
-      className="rounded bg-terminal-accent px-3 py-1.5 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
+      className="form-action form-action-primary w-auto px-4"
     >
       Connect
     </button>

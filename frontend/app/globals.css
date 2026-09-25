@@ -73,7 +73,8 @@ summary:focus-visible, a:focus-visible, button:focus-visible, input:focus-visibl
 .signal-card { border: 1px solid var(--color-terminal-border); border-radius: 1rem; background: linear-gradient(135deg, rgba(17,36,59,.72), rgba(7,17,31,.32)); padding: 20px 24px; box-shadow: inset 0 1px 0 rgba(238,245,255,.05); }
 .code-card { border: 1px solid var(--color-terminal-border); border-radius: 1rem; background: linear-gradient(135deg, rgba(17,36,59,.88), rgba(7,17,31,.72)); box-shadow: inset 0 1px 0 rgba(238,245,255,.06), 0 18px 40px rgba(0,0,0,.14); }
 .decision-list { border-left: 1px solid var(--color-terminal-border); padding-left: 24px; }
-.console-shell { box-shadow: 0 24px 60px rgba(0,0,0,.16), inset 0 1px 0 rgba(238,245,255,.04); }
+.console-shell { border-radius: 1.25rem; box-shadow: 0 24px 60px rgba(0,0,0,.16), inset 0 1px 0 rgba(238,245,255,.04); }
+.decision-panel { border-radius: 1rem; }
 .console-data-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--color-terminal-border); border-left: 1px solid var(--color-terminal-border); }
 .console-data-grid > div { display: flex; min-height: 7rem; flex-direction: column; justify-content: space-between; gap: .5rem; border-right: 1px solid var(--color-terminal-border); border-bottom: 1px solid var(--color-terminal-border); padding: 1rem; }
 .console-data-grid span, .console-data-grid small { color: var(--color-terminal-muted); font-family: var(--font-mono); font-size: .62rem; letter-spacing: .05em; text-transform: uppercase; }
@@ -177,3 +178,32 @@ summary:focus-visible, a:focus-visible, button:focus-visible, input:focus-visibl
 .eyebrow.status-real { color: var(--color-decision-allow); }
 .eyebrow.status-config { color: var(--color-decision-limit); }
 .eyebrow.status-none { color: var(--color-terminal-muted); }
+
+/* Product surface: form card system (matches .signal-card / .code-card on the landing page) */
+.form-card { border: 1px solid var(--color-terminal-border); border-radius: 1rem; background: linear-gradient(135deg, rgba(17,36,59,.72), rgba(7,17,31,.32)); padding: 20px; box-shadow: inset 0 1px 0 rgba(238,245,255,.05); }
+.form-card + .form-card { margin-top: 16px; }
+.form-card.border-dashed { border-style: dashed; }
+.form-card-title { margin-bottom: 14px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .12em; line-height: 1.5; text-transform: uppercase; color: var(--color-terminal-muted); }
+.field-label { display: block; margin-bottom: 8px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .1em; line-height: 1.5; text-transform: uppercase; color: var(--color-terminal-muted); }
+.field-input { width: 100%; border: 1px solid var(--color-terminal-border); border-radius: .6rem; background: var(--color-terminal-bg); padding: 10px 14px; font-size: .875rem; color: var(--color-terminal-text); transition: border-color 160ms ease, background 160ms ease; }
+.field-input:hover { border-color: rgba(145,165,189,.4); }
+.field-input:focus { outline: none; border-color: var(--color-terminal-accent); background: rgba(13,27,46,.5); }
+.field-input::placeholder { color: rgba(145,165,189,.5); }
+.field-prefix-group { position: relative; }
+.field-prefix-group .field-input { padding-left: 26px; }
+.field-prefix-group::before { content: "$"; position: absolute; top: 50%; left: 14px; transform: translateY(-50%); color: var(--color-terminal-muted); font-size: .875rem; pointer-events: none; }
+.select-field { width: 100%; appearance: none; -webkit-appearance: none; border: 1px solid var(--color-terminal-border); border-radius: .6rem; background-color: var(--color-terminal-bg); background-image: linear-gradient(45deg, transparent 50%, var(--color-terminal-muted) 50%), linear-gradient(135deg, var(--color-terminal-muted) 50%, transparent 50%); background-position: calc(100% - 18px) center, calc(100% - 13px) center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding: 10px 34px 10px 14px; font-family: var(--font-mono); font-size: .75rem; color: var(--color-terminal-text); transition: border-color 160ms ease; }
+.select-field:hover { border-color: rgba(145,165,189,.4); }
+.select-field:focus { outline: none; border-color: var(--color-terminal-accent); }
+.form-action { display: inline-flex; width: 100%; align-items: center; justify-content: center; border-radius: .6rem; padding: 11px 14px; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; transition: transform 160ms ease, opacity 160ms ease, background 160ms ease; }
+.form-action-primary { background: var(--color-terminal-accent); color: var(--color-terminal-accent-fg); box-shadow: 0 8px 20px rgba(255,112,88,.16), inset 0 1px 0 rgba(255,255,255,.25); }
+.form-action-primary:hover:not(:disabled) { transform: translateY(-1px); }
+.form-action-primary:disabled { opacity: .4; box-shadow: none; cursor: not-allowed; }
+.form-action-secondary { border: 1px solid var(--color-terminal-border); background: rgba(13,27,46,.34); color: var(--color-terminal-text); }
+.form-action-secondary:hover:not(:disabled) { background: rgba(145,165,189,.1); border-color: rgba(145,165,189,.4); }
+.form-action-secondary:disabled { opacity: .4; cursor: not-allowed; }
+.field-hint { margin-top: 6px; font-size: .75rem; color: var(--color-terminal-muted); }
+.field-error { margin-top: 6px; font-size: .75rem; color: var(--color-decision-block); }
+.field-warn { margin-top: 6px; font-size: .75rem; color: var(--color-decision-limit); }
+.decision-reserved { opacity: .6; }
+.reserved-tag { align-self: flex-start; width: fit-content; margin-left: 8px; border: 1px solid var(--color-terminal-border); border-radius: 999px; padding: 2px 8px; font-family: var(--font-mono); font-size: .55rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--color-terminal-muted); vertical-align: middle; }

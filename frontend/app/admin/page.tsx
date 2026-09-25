@@ -32,7 +32,7 @@ export default function AdminPage() {
     return (
       <main className="mx-auto max-w-md px-6 py-16 text-center">
         <div className="text-sm text-terminal-muted">
-          Operator Mode -- connect the Registry owner wallet to access this screen.
+          Operator Mode — connect the Registry owner wallet to access this screen.
         </div>
       </main>
     );
@@ -41,17 +41,18 @@ export default function AdminPage() {
   return (
     <main className="mx-auto max-w-md px-6 py-8">
       <div className="mb-6">
-        <div className="text-xs uppercase tracking-wide text-decision-limit mb-1">Operator Mode</div>
-        <div className="text-lg font-semibold">CortexRails / Operator</div>
+        <p className="eyebrow status-config">Operator Mode</p>
+        <div className="mt-2 text-lg font-semibold tracking-tight">CortexRails / Operator</div>
       </div>
 
-      <div className="rounded border border-terminal-border bg-terminal-surface p-4 space-y-4">
+      <div className="form-card space-y-4">
         <div>
-          <div className="text-xs uppercase tracking-wide text-terminal-muted mb-1">Lifecycle</div>
+          <label htmlFor="admin-lifecycle" className="field-label">Lifecycle</label>
           <select
+            id="admin-lifecycle"
             value={lifecycleTarget}
             onChange={(e) => setLifecycleTarget(Number(e.target.value))}
-            className="w-full rounded border border-terminal-border bg-terminal-bg px-3 py-2 text-sm"
+            className="select-field"
           >
             {LIFECYCLE_LABELS.map((label, i) => (
               <option key={label} value={i}>
@@ -63,19 +64,21 @@ export default function AdminPage() {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <div className="text-xs uppercase tracking-wide text-terminal-muted mb-1">Collateral Factor (bps)</div>
+            <label htmlFor="admin-collateral" className="field-label">Collateral Factor (bps)</label>
             <input
+              id="admin-collateral"
               value={collateralBps}
               onChange={(e) => setCollateralBps(e.target.value)}
-              className="w-full rounded border border-terminal-border bg-terminal-bg px-3 py-2 text-sm"
+              className="field-input"
             />
           </div>
           <div>
-            <div className="text-xs uppercase tracking-wide text-terminal-muted mb-1">Risk Adjustment (bps)</div>
+            <label htmlFor="admin-risk" className="field-label">Risk Adjustment (bps)</label>
             <input
+              id="admin-risk"
               value={riskBps}
               onChange={(e) => setRiskBps(e.target.value)}
-              className="w-full rounded border border-terminal-border bg-terminal-bg px-3 py-2 text-sm"
+              className="field-input"
             />
           </div>
         </div>
@@ -90,7 +93,7 @@ export default function AdminPage() {
                 args: [ASSET_ID, lifecycleTarget],
               })
             }
-            className="flex-1 rounded border border-terminal-border px-3 py-2 text-xs uppercase tracking-wide hover:bg-terminal-bg"
+            className="form-action form-action-secondary flex-1"
           >
             Transition Lifecycle
           </button>
@@ -103,22 +106,22 @@ export default function AdminPage() {
                 args: [ASSET_ID, assetState?.price ?? 0n, 10n ** 18n, BigInt(collateralBps), BigInt(riskBps)],
               })
             }
-            className="flex-1 rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-white hover:opacity-90"
+            className="form-action form-action-primary flex-1"
           >
             Update Risk Params
           </button>
         </div>
       </div>
 
-      <div className="mt-6 pt-4 border-t border-terminal-border text-xs text-terminal-muted space-y-1">
+      <div className="mt-6 space-y-1 border-t border-terminal-border pt-4 text-xs text-terminal-muted">
         <div>
           Current state:{" "}
           <span className="text-terminal-text">
-            {assetState ? LIFECYCLE_LABELS[assetState.lifecycle] : "--"}
+            {assetState ? LIFECYCLE_LABELS[assetState.lifecycle] : "—"}
           </span>
         </div>
         <div>
-          Owner: <span className="text-terminal-text">{owner ?? "--"}</span>
+          Owner: <span className="text-terminal-text">{owner ?? "—"}</span>
         </div>
       </div>
     </main>

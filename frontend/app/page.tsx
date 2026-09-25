@@ -82,7 +82,7 @@ const consumers = [
 const decisions = [
   { name: "ALLOW", tone: "text-decision-allow", text: "The action satisfies policy." },
   { name: "LIMIT", tone: "text-decision-limit", text: "The requested amount exceeds the permitted amount. The response carries the maximum permitted." },
-  { name: "REVIEW", tone: "text-decision-review", text: "Reserved in the Decision enum for a manual-review path. No policy branch returns it today." },
+  { name: "REVIEW", tone: "text-decision-review", text: "Reserved in the Decision enum for a manual-review path. No policy branch returns it today.", reserved: true },
   { name: "BLOCK", tone: "text-decision-block", text: "The action violates policy, for example a non-ACTIVE lifecycle or zero capacity." },
 ];
 
@@ -240,7 +240,7 @@ export default function Landing() {
             <p>The same state and the same request always produce the same response. LIMIT returns the maximum permitted amount, and CortexRails never quietly reduces the request. The caller decides whether to resubmit.</p>
           </SectionHeading>
           <div className="decision-grid">
-            {decisions.map((d) => <div key={d.name}><span className={`font-mono text-xl font-semibold ${d.tone}`}>{d.name}</span><p>{d.text}</p></div>)}
+            {decisions.map((d) => <div key={d.name} className={d.reserved ? "decision-reserved" : undefined}><span className={`font-mono text-xl font-semibold ${d.tone}`}>{d.name}</span>{d.reserved && <span className="reserved-tag">Reserved</span>}<p>{d.text}</p></div>)}
           </div>
         </div>
         <div className="mt-12"><LandingPolicyDemo /></div>

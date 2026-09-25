@@ -62,13 +62,13 @@ export const LIFECYCLE_LABELS = [
 export const DECISION_LABELS = ["ALLOW", "LIMIT", "REVIEW", "BLOCK"] as const;
 
 export function formatUnits18(value: bigint | undefined): string {
-  if (value === undefined) return "--";
+  if (value === undefined) return "—";
   const whole = value / ONE;
   return whole.toLocaleString("en-US");
 }
 
 export function bpsToPercent(bps: bigint | undefined): string {
-  if (bps === undefined) return "--";
+  if (bps === undefined) return "—";
   return `${(Number(bps) / 100).toFixed(0)}%`;
 }
 
@@ -79,11 +79,11 @@ const KNOWN_ERRORS: Record<string, string> = {
   PolicyBlocked: "Blocked by policy",
   ExceedsPermittedAmount: "Exceeds permitted amount",
   AssetNotInitialized: "Asset not initialized",
-  NoPosition: "No position -- deposit first",
+  NoPosition: "No position — deposit first",
   InvalidBps: "Invalid parameter value",
   ExceedsPosition: "Exceeds available position",
   WouldUnderCollateralizeDebt: "Would leave debt uncollateralized",
-  OutstandingDebtBlocksTransfer: "Outstanding debt blocks transfer -- repay first",
+  OutstandingDebtBlocksTransfer: "Outstanding debt blocks transfer — repay first",
 };
 
 export function decodeRevertReason(error: unknown): string {

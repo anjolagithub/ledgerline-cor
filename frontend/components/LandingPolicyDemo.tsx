@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 /// Local, in-browser mirror of LedgerLinePolicy.canExecute()'s BORROW
-/// branch -- no chain call. Rules and reason strings are copied from
+/// branch — no chain call. Rules and reason strings are copied from
 /// contracts/src/LedgerLinePolicy.sol / LedgerLineTypes.sol:
 ///   lifecycle != ACTIVE      -> BLOCK, permittedAmount 0, reason = state
 ///   capacity == 0            -> BLOCK, permittedAmount 0, "NO_CAPACITY"
@@ -50,7 +50,7 @@ export function LandingPolicyDemo() {
   const toneClass = TONE[decision];
 
   return (
-    <div className="policy-demo border border-terminal-border bg-terminal-surface p-5 md:p-7">
+    <div className="code-card p-5 md:p-7">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-2 border-b border-terminal-border pb-4">
         <span className="font-mono text-[10px] uppercase tracking-[.14em] text-terminal-muted">Policy simulation · Action.BORROW</span>
         <span className="font-mono text-[10px] text-terminal-muted">Runs in your browser · no chain call</span>
@@ -59,17 +59,17 @@ export function LandingPolicyDemo() {
         <section className="flex flex-col gap-5" aria-label="Policy simulation inputs">
           <div>
             <label htmlFor="sim-lifecycle" className="eyebrow">Asset lifecycle</label>
-            <select id="sim-lifecycle" value={lifecycle} onChange={(e) => setLifecycle(e.target.value as Lifecycle)} className="mt-2 w-full border border-terminal-border bg-terminal-bg px-3 py-3 font-mono text-xs text-terminal-text focus:outline-none">
+            <select id="sim-lifecycle" value={lifecycle} onChange={(e) => setLifecycle(e.target.value as Lifecycle)} className="select-field mt-2">
               {LIFECYCLES.map((state) => <option key={state} value={state}>{state}</option>)}
             </select>
           </div>
           <div>
             <label htmlFor="sim-risk" className="eyebrow">Risk adjustment</label>
-            <select id="sim-risk" value={riskBps} onChange={(e) => setRiskBps(Number(e.target.value))} className="mt-2 w-full border border-terminal-border bg-terminal-bg px-3 py-3 font-mono text-xs text-terminal-text focus:outline-none">
+            <select id="sim-risk" value={riskBps} onChange={(e) => setRiskBps(Number(e.target.value))} className="select-field mt-2">
               {RISK_OPTIONS.map((option) => <option key={option.bps} value={option.bps}>{option.label}</option>)}
             </select>
           </div>
-          <div className="border border-terminal-border bg-terminal-bg p-4">
+          <div className="rounded-[.75rem] border border-terminal-border bg-terminal-bg p-4">
             <div className="grid gap-3 font-mono text-xs">
               <div className="flex justify-between"><span className="text-terminal-muted">Position value</span><span>${POSITION_VALUE.toLocaleString()}</span></div>
               <div className="flex justify-between"><span className="text-terminal-muted">× Collateral factor</span><span>70%</span></div>
@@ -79,10 +79,10 @@ export function LandingPolicyDemo() {
           </div>
           <div>
             <label htmlFor="landing-demo-amount" className="eyebrow">Requested borrow (USDG)</label>
-            <div className="mt-2 flex items-center border border-terminal-border bg-terminal-bg"><span className="pl-3 text-terminal-muted">$</span><input id="landing-demo-amount" type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-transparent px-2 py-3 font-mono text-sm focus:outline-none" /></div>
+            <div className="field-prefix-group mt-2"><input id="landing-demo-amount" type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="field-input font-mono text-sm" /></div>
           </div>
         </section>
-        <section className="flex flex-col justify-between gap-6 border border-terminal-border bg-terminal-bg p-5 font-mono text-xs leading-6" aria-label="Simulated PolicyResponse" aria-live="polite">
+        <section className="flex flex-col justify-between gap-6 rounded-[.75rem] border border-terminal-border bg-terminal-bg p-5 font-mono text-xs leading-6" aria-label="Simulated PolicyResponse" aria-live="polite">
           <div className="text-terminal-muted">
             <div>canExecute(1, positionId, BORROW, {requested.toLocaleString()})</div>
             <div>lifecycle: <span className="text-terminal-text">{lifecycle}</span></div>

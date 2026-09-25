@@ -26,12 +26,12 @@ export function WithdrawForm({
   const disabled = !amount || exceedsPosition || !isActive || submitting;
 
   return (
-    <div className="rounded border border-terminal-border bg-terminal-surface p-4">
-      <div className="text-xs uppercase tracking-wide text-terminal-muted mb-3">Withdraw Stock Token</div>
-      <div className="mb-3 text-xs text-terminal-muted">
+    <div className="form-card">
+      <div className="form-card-title">Withdraw Stock Token</div>
+      <div className="field-hint mb-3 mt-0">
         Position <span className="text-terminal-text">{formatUnits18(positionRawBalance)} {symbol ?? ""}</span>
       </div>
-      <label htmlFor="withdraw-amount" className="block text-xs uppercase tracking-wide text-terminal-muted mb-2">
+      <label htmlFor="withdraw-amount" className="field-label">
         Shares
       </label>
       <input
@@ -44,39 +44,36 @@ export function WithdrawForm({
         onChange={(e) => setAmount(e.target.value)}
         placeholder="0"
         aria-describedby="withdraw-help"
-        className="w-full rounded border border-terminal-border bg-terminal-bg px-3 py-2 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-terminal-accent"
+        className="field-input mb-1"
       />
-      {exceedsPosition && (
-        <div className="text-xs text-decision-block mb-2">Exceeds your position</div>
-      )}
+      {exceedsPosition && <div className="field-error">Exceeds your position</div>}
       {!isActive && (
-        <div id="withdraw-help" className="mb-2 text-xs text-decision-limit">
-          Lifecycle is not ACTIVE -- withdrawals are blocked.
+        <div id="withdraw-help" className="field-warn">
+          Lifecycle is not ACTIVE — withdrawals are blocked.
         </div>
       )}
-      {tx.status === "wrong-network" ? (
-        <button
-          onClick={tx.switchToCorrectNetwork}
-          className="w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
-        >
-          Switch Network
-        </button>
-      ) : (
-        <button
-          disabled={disabled}
-          onClick={() =>
-            tx.execute({
-              address: VAULT_ADAPTER.address,
-              abi: VAULT_ADAPTER.abi,
-              functionName: "withdraw",
-              args: [parsedAmount],
-            })
-          }
-          className="w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90 disabled:opacity-40"
-        >
-          Withdraw
-        </button>
-      )}
+      <div className="mt-3">
+        {tx.status === "wrong-network" ? (
+          <button onClick={tx.switchToCorrectNetwork} className="form-action form-action-primary">
+            Switch Network
+          </button>
+        ) : (
+          <button
+            disabled={disabled}
+            onClick={() =>
+              tx.execute({
+                address: VAULT_ADAPTER.address,
+                abi: VAULT_ADAPTER.abi,
+                functionName: "withdraw",
+                args: [parsedAmount],
+              })
+            }
+            className="form-action form-action-primary"
+          >
+            Withdraw
+          </button>
+        )}
+      </div>
       <TransactionStatus status={tx.status} hash={tx.hash} message={tx.message} />
     </div>
   );

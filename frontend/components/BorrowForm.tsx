@@ -57,8 +57,8 @@ export function BorrowForm({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border-2 border-terminal-border bg-terminal-surface p-6">
-        <div className="text-xs uppercase tracking-wide text-terminal-muted mb-4 font-medium">Policy Evaluation</div>
+      <div className="form-card">
+        <div className="form-card-title">Policy Evaluation</div>
 
         <PolicyEquation
           positionValue={positionValue}
@@ -69,7 +69,7 @@ export function BorrowForm({
 
         <div className="mt-4">
           {evaluationMessage ? (
-            <div className="border border-terminal-border bg-terminal-bg px-4 py-4 text-sm text-terminal-muted" role="status">
+            <div className="rounded-[.6rem] border border-terminal-border bg-terminal-bg px-4 py-4 text-sm text-terminal-muted" role="status">
               {evaluationMessage}
             </div>
           ) : (
@@ -78,31 +78,27 @@ export function BorrowForm({
         </div>
       </div>
 
-      <div className="rounded border border-terminal-border bg-terminal-surface p-4">
-        <label
-          htmlFor="borrow-amount"
-          className="block text-xs uppercase tracking-wide text-terminal-muted mb-2"
-        >
+      <div className="form-card">
+        <label htmlFor="borrow-amount" className="field-label">
           Borrow Amount (USD)
         </label>
-        <input
-          id="borrow-amount"
-          type="number"
-          min="0"
-          step="1"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="100000"
-          aria-describedby="borrow-help"
-          className="w-full rounded border border-terminal-border bg-terminal-bg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-terminal-accent"
-        />
-        <p id="borrow-help" className="mb-3 text-xs text-terminal-muted">Policy is evaluated before any transaction is sent.</p>
+        <div className="field-prefix-group">
+          <input
+            id="borrow-amount"
+            type="number"
+            min="0"
+            step="1"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="100,000"
+            aria-describedby="borrow-help"
+            className="field-input mb-1"
+          />
+        </div>
+        <p id="borrow-help" className="field-hint mb-3">Policy is evaluated before any transaction is sent.</p>
         {tx.status === "wrong-network" ? (
-          <button
-            onClick={tx.switchToCorrectNetwork}
-            className="w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90"
-          >
+          <button onClick={tx.switchToCorrectNetwork} className="form-action form-action-primary">
             Switch Network
           </button>
         ) : (
@@ -116,9 +112,9 @@ export function BorrowForm({
                 args: [parsedAmount],
               })
             }
-            className="w-full rounded bg-terminal-accent px-3 py-2 text-xs uppercase tracking-wide text-terminal-accent-fg font-medium hover:opacity-90 disabled:opacity-40"
+            className="form-action form-action-primary"
           >
-            {canSubmit ? "Borrow" : "Preview only -- adjust amount"}
+            {canSubmit ? "Borrow" : "Preview only — adjust amount"}
           </button>
         )}
         <TransactionStatus status={tx.status} hash={tx.hash} message={tx.message} />
