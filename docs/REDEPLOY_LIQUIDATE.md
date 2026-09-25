@@ -37,6 +37,26 @@ before moving to the next. Never chain a deploy and an `onlyOwner` call in
 one broadcast (see `RedeployVaultAdapter.s.sol` and
 `docs/DEPLOYMENTS.md` for the real incident that rule exists because of).
 
+### 0. Deploy a new RiskEngine (required for LIQUIDATE to actually work)
+
+The live RiskEngine (`0xf661dA9D3f214A181014Bc7ba8590B90F9314eC4`) predates
+commit `647136f`, which added `isLiquidatable()`. Policy's LIQUIDATE branch
+calls that function, so wiring the new Policy to the old RiskEngine makes
+every LIQUIDATE check revert. Deploy a fresh one first:
+
+```
+cd stylus/risk-engine
+cargo stylus check  --endpoint $RPC_URL
+cargo stylus deploy --endpoint $RPC_URL --keystore-path ~/.foundry/keystores/<keystore>
+cast call <NEW_RISK_ENGINE> "isLiquidatable(uint256,uint256,uint256)(bool)" 100 7000 71 --rpc-url $RPC_URL   # expect true
+```
+
+(`cargo stylus deploy`'s exact flags vary by version — run `cargo stylus
+deploy --help` if the keystore flag above is rejected.) Then set
+`RISK_ENGINE` in `RedeployPolicy2.s.sol` to this address — the script now
+`require()`s it be set to something other than the zero address before it
+will broadcast, specifically so this step can't be silently skipped.
+
 ### 1. Deploy the new Policy
 
 ```
