@@ -77,6 +77,13 @@ const consumers = [
     policy: "Lifecycle must be ACTIVE · permitted up to the full position",
     adapter: "Adapter blocks the transfer while any debt is outstanding",
   },
+  {
+    action: "LIQUIDATE",
+    contract: "LedgerLineLiquidationAdapter",
+    text: "CortexRails evaluates whether a position's real, live debt has crossed the Stylus RiskEngine's maintenance threshold. Policy stays debt-agnostic by design -- the adapter supplies the borrower's actual debt from LendingAdapter as the request amount.",
+    policy: "Debt supplied by the adapter must exceed value × collateral factor",
+    adapter: "Permissionless: any caller repays part of the debt and receives seized collateral in return",
+  },
 ];
 
 const decisions = [
@@ -91,7 +98,7 @@ const inputs = [
   { name: "POSITION", text: "Raw collateral balance per (assetId, positionId)." },
   { name: "RISK", text: "Collateral factor and risk adjustment, each bounded to ≤ 100%." },
   { name: "LIFECYCLE", text: "ACTIVE · RESTRICTED · CORPORATE_ACTION · SUSPENDED · MATURING · REDEEMABLE · REDEEMED. Any state other than ACTIVE blocks every action with a state-specific reason." },
-  { name: "ACTION", text: "BORROW, WITHDRAW and TRANSFER have consumers. LIQUIDATE's canExecute() decision path is live (Policy + RiskEngine.isLiquidatable()) but has no consumer contract or UI flow yet -- callable via canExecute(), not actionable from this app. INCREASE_LEVERAGE remains reserved in the enum only." },
+  { name: "ACTION", text: "BORROW, WITHDRAW, TRANSFER and LIQUIDATE all have real consumers. LedgerLineLiquidationAdapter derives a borrower's live debt from LendingAdapter, asks canExecute() with Action.LIQUIDATE, and on ALLOW calls LendingAdapter's liquidate() to move tokens -- permissionless, like every reference lending protocol's liquidation path. INCREASE_LEVERAGE remains reserved in the enum only." },
 ];
 
 const deployed = [
@@ -99,9 +106,10 @@ const deployed = [
   { name: "LedgerLinePolicy", role: "canExecute()", address: "0xD6ECf112af596E82DEb2EEb9e989eE6B093D5460" },
   { name: "PositionEngine", role: "Stylus (Rust/WASM)", address: "0xde8365dAF3CFdF952E2F946F19a4DcAcd57eFf0F" },
   { name: "RiskEngine", role: "Stylus (Rust/WASM) · isLiquidatable()", address: "0x10246f909139Aa83f7C223012bDd656472b3C2bc" },
-  { name: "LedgerLineLendingAdapter", role: "BORROW/repay() consumer", address: "0x020Bdf07C8970877677Ef064670a4d3BbDBcCa43" },
-  { name: "LedgerLineVaultAdapter", role: "WITHDRAW consumer", address: "0x919e140aa7277B64ecB124Eb79273E6fEd7682c7" },
-  { name: "LedgerLineTransferAdapter", role: "TRANSFER consumer", address: "0x8cAA372169A22a1963F686Bf0fD78D84057641B9" },
+  { name: "LedgerLineLendingAdapter", role: "BORROW/repay()/liquidate() consumer", address: "0x5e559ADeb6B69E7c6f26c0aE51071a162Aa6560d" },
+  { name: "LedgerLineVaultAdapter", role: "WITHDRAW consumer", address: "0x4E94e5AdB0b03Be4E9d7336Da7f847E4E4BA9C43" },
+  { name: "LedgerLineTransferAdapter", role: "TRANSFER consumer", address: "0x32D47195108fE08aA518D9779689F83E2154D4f1" },
+  { name: "LedgerLineLiquidationAdapter", role: "LIQUIDATE consumer", address: "0xB24Af6a1bAfAB462DAa4776C0bc884Ce70B3a97d" },
   { name: "RobinhoodStockTokenAdapter", role: "Asset adapter · not wired into Registry", address: "0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9" },
   { name: "TSLA Stock Token", role: "Collateral · 18 decimals", address: "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E" },
   { name: "USDG", role: "Borrow asset · 6 decimals", address: "0x7E955252E15c84f5768B83c41a71F9eba181802F" },
@@ -111,9 +119,9 @@ const stack = [
   ["Asset adapter", "RobinhoodStockTokenAdapter · deployed, not yet wired to Registry"],
   ["Registry / state", "LedgerLineRegistry"],
   ["Position engine", "Stylus · position value"],
-  ["Risk engine", "Stylus · borrowing capacity"],
+  ["Risk engine", "Stylus · borrowing capacity + isLiquidatable()"],
   ["Policy", "canExecute()"],
-  ["Financial adapter", "Lending · Vault · Transfer"],
+  ["Financial adapter", "Lending · Vault · Transfer · Liquidation"],
 ];
 
 const navLinks = [
@@ -164,7 +172,7 @@ export default function Landing() {
             <Link href="/app" className="primary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] text-terminal-accent-fg transition-transform hover:-translate-y-0.5">Explore the policy engine <span aria-hidden="true" className="ml-1">→</span></Link>
             <a href={REPO} target="_blank" rel="noreferrer" className="secondary-action px-5 py-3.5 text-xs font-bold uppercase tracking-[.12em] transition-colors hover:bg-terminal-surface">View on GitHub</a>
           </div>
-          <div className="hero-proof-grid"><div><strong>1</strong><span>policy surface</span></div><div><strong>3</strong><span>consumer adapters</span></div><div><strong>2</strong><span>Stylus engines</span></div></div>
+          <div className="hero-proof-grid"><div><strong>1</strong><span>policy surface</span></div><div><strong>4</strong><span>consumer adapters</span></div><div><strong>2</strong><span>Stylus engines</span></div></div>
         </div>
         <ol className="intent-flow" aria-label="How a request flows through CortexRails">
           {heroFlow.map((step) => (
@@ -289,7 +297,7 @@ export default function Landing() {
             <p>Chain ID 46630. The current testnet deployment demonstrates CortexRails against the real TSLA Stock Token and USDG contracts, while policy state and reference pricing remain operator-configured in the test environment.</p>
           </SectionHeading>
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="status-block"><span className="eyebrow status-real">Real / deployed</span><ul><li>Robinhood Chain testnet</li><li>Real TSLA Stock Token collateral</li><li>Real USDG borrow asset (6-decimal scaling)</li><li>Stylus PositionEngine and RiskEngine</li><li>Registry, Policy, three consumer adapters</li><li>canExecute() computed live on every call</li></ul></div>
+            <div className="status-block"><span className="eyebrow status-real">Real / deployed</span><ul><li>Robinhood Chain testnet</li><li>Real TSLA Stock Token collateral</li><li>Real USDG borrow asset (6-decimal scaling)</li><li>Stylus PositionEngine and RiskEngine</li><li>Registry, Policy, four consumer adapters (Lending, Vault, Transfer, Liquidation)</li><li>canExecute() computed live on every call</li></ul></div>
             <div className="status-block"><span className="eyebrow status-config">Operator-configured</span><ul><li>Policy reference price ($364.27)</li><li>Lifecycle state</li><li>Collateral factor and risk adjustment</li><li>No oracle pushes into the Registry automatically</li></ul></div>
             <div className="status-block"><span className="eyebrow status-none">Not claimed</span><ul><li>Mainnet or production readiness</li><li>Decentralized live equity pricing</li><li>Automatic oracle-to-policy sync</li><li>Support for every tokenized asset</li><li>Third-party audit</li></ul></div>
           </div>

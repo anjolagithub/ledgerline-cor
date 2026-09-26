@@ -3,3 +3,4 @@ export { LedgerLinePolicyAbi } from "./LedgerLinePolicy";
 export { LedgerLineLendingAdapterAbi } from "./LedgerLineLendingAdapter";
 export { LedgerLineVaultAdapterAbi } from "./LedgerLineVaultAdapter";
 export { LedgerLineTransferAdapterAbi } from "./LedgerLineTransferAdapter";
+export { LedgerLineLiquidationAdapterAbi } from "./LedgerLineLiquidationAdapter";

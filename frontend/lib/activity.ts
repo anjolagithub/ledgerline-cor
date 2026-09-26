@@ -27,6 +27,12 @@ export const VAULT_ADAPTER_DEPLOY_BLOCK = 122446953n;
 // the actual deploy block of the current, only-ever TRANSFER_ADAPTER.address.
 export const TRANSFER_ADAPTER_DEPLOY_BLOCK = 123081162n;
 
+// LedgerLineLiquidationAdapter is a brand-new contract (no prior
+// address to have scanned from too early, unlike the other three
+// adapters above) -- read directly from the real deploy tx's block,
+// contracts/broadcast/DeployLiquidationAdapter.s.sol/46630/run-latest.json.
+export const LIQUIDATION_ADAPTER_DEPLOY_BLOCK = 124662488n;
+
 export const EXPLORER_TX_BASE_URL = "https://explorer.testnet.chain.robinhood.com/tx";
 
 /// Extracts just the named event ABI items from a contract's full ABI,
@@ -38,7 +44,7 @@ export function pickEvents(abi: Abi, names: string[]): AbiEvent[] {
   );
 }
 
-export type ActivityKind = "deposit" | "borrow" | "withdraw" | "transfer" | "lifecycle" | "parameters";
+export type ActivityKind = "deposit" | "borrow" | "withdraw" | "transfer" | "liquidate" | "lifecycle" | "parameters";
 
 // Raw decoded fields only -- no display strings are baked in here, so
 // formatting (which depends on the live-read stock symbol) always
@@ -58,6 +64,9 @@ export type ActivityRow = {
   price?: bigint;
   collateralFactorBps?: bigint;
   riskAdjustmentBps?: bigint;
+  liquidator?: Address;
+  seizeAmount?: bigint;
+  debtAtLiquidation?: bigint;
 };
 
 type DecodedLog = {
@@ -98,6 +107,21 @@ export function toActivityRow(log: DecodedLog, timestamp: bigint | undefined): A
         to: args.to as Address,
         amount: args.amount as bigint,
       };
+    case "Liquidated":
+      // Emitted by LedgerLineLiquidationAdapter (not LendingAdapter's own
+      // internal Liquidated event, which fires in the same tx but carries
+      // repayer/seizure bookkeeping fields, not the debtAtLiquidation
+      // figure this one adds) -- see
+      // contracts/src/LedgerLineLiquidationAdapter.sol.
+      return {
+        ...base,
+        kind: "liquidate",
+        user: args.borrower as Address,
+        liquidator: args.liquidator as Address,
+        amount: args.repayAmount as bigint,
+        seizeAmount: args.seizeAmount as bigint,
+        debtAtLiquidation: args.debtAtLiquidation as bigint,
+      };
     case "LifecycleTransitioned":
       return { ...base, kind: "lifecycle", lifecycleFrom: Number(args.from), lifecycleTo: Number(args.to) };
     case "AssetParametersUpdated":
@@ -125,6 +149,7 @@ const KIND_LABELS: Record<ActivityKind, string> = {
   borrow: "Borrow",
   withdraw: "Withdraw",
   transfer: "Transfer",
+  liquidate: "Liquidate",
   lifecycle: "Lifecycle Change",
   parameters: "Parameters Updated",
 };
@@ -146,6 +171,16 @@ export function describeRow(row: ActivityRow, stockSymbol: string): { label: str
         label,
         amountText: `${formatUnits18(row.amount)} ${stockSymbol}`,
         detailText: row.to ? `To ${row.to.slice(0, 6)}...${row.to.slice(-4)}` : undefined,
+      };
+    case "liquidate":
+      // repayAmount and seizeAmount are both 18-decimal internal units
+      // (dollar-notional debt repaid, and collateral shares seized) --
+      // same convention as borrow's amount and deposit/withdraw's
+      // amount, respectively.
+      return {
+        label,
+        amountText: `$${formatUnits18(row.amount)} repaid / ${formatUnits18(row.seizeAmount)} ${stockSymbol} seized`,
+        detailText: row.liquidator ? `By ${row.liquidator.slice(0, 6)}...${row.liquidator.slice(-4)}` : undefined,
       };
     case "borrow":
       // NOTE: the contract's emitted `amount` is the 18-decimal internal

@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { usePublicClient, useWatchContractEvent } from "wagmi";
-import { REGISTRY, LENDING_ADAPTER, VAULT_ADAPTER, TRANSFER_ADAPTER } from "./contracts";
+import { REGISTRY, LENDING_ADAPTER, VAULT_ADAPTER, TRANSFER_ADAPTER, LIQUIDATION_ADAPTER } from "./contracts";
 import {
   type ActivityRow,
   LENDING_ADAPTER_DEPLOY_BLOCK,
   REGISTRY_DEPLOY_BLOCK,
   VAULT_ADAPTER_DEPLOY_BLOCK,
   TRANSFER_ADAPTER_DEPLOY_BLOCK,
+  LIQUIDATION_ADAPTER_DEPLOY_BLOCK,
   pickEvents,
   sortRowsDesc,
   toActivityRow,
@@ -42,7 +43,7 @@ export function useActivityRows() {
       setLoading(true);
       setError(undefined);
       try {
-        const [lendingLogs, vaultLogs, transferLogs, registryLogs] = await Promise.all([
+        const [lendingLogs, vaultLogs, transferLogs, liquidationLogs, registryLogs] = await Promise.all([
           publicClient.getLogs({
             address: LENDING_ADAPTER.address,
             events: pickEvents(LENDING_ADAPTER.abi, ["Deposited", "Borrowed"]),
@@ -62,6 +63,12 @@ export function useActivityRows() {
             toBlock: "latest",
           }),
           publicClient.getLogs({
+            address: LIQUIDATION_ADAPTER.address,
+            events: pickEvents(LIQUIDATION_ADAPTER.abi, ["Liquidated"]),
+            fromBlock: LIQUIDATION_ADAPTER_DEPLOY_BLOCK,
+            toBlock: "latest",
+          }),
+          publicClient.getLogs({
             address: REGISTRY.address,
             events: pickEvents(REGISTRY.abi, ["LifecycleTransitioned", "AssetParametersUpdated"]),
             fromBlock: REGISTRY_DEPLOY_BLOCK,
@@ -69,7 +76,7 @@ export function useActivityRows() {
           }),
         ]);
 
-        const allLogs = [...lendingLogs, ...vaultLogs, ...transferLogs, ...registryLogs];
+        const allLogs = [...lendingLogs, ...vaultLogs, ...transferLogs, ...liquidationLogs, ...registryLogs];
         const uniqueBlockNumbers = Array.from(new Set(allLogs.map((log) => log.blockNumber))).filter(
           (blockNumber): blockNumber is bigint => blockNumber !== null
         );
@@ -151,6 +158,12 @@ export function useActivityRows() {
     address: TRANSFER_ADAPTER.address,
     abi: TRANSFER_ADAPTER.abi,
     eventName: "Transferred",
+    onLogs: appendLiveLogs,
+  });
+  useWatchContractEvent({
+    address: LIQUIDATION_ADAPTER.address,
+    abi: LIQUIDATION_ADAPTER.abi,
+    eventName: "Liquidated",
     onLogs: appendLiveLogs,
   });
   useWatchContractEvent({

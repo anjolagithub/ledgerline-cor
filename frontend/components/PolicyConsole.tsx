@@ -11,6 +11,7 @@ import { DepositForm } from "./DepositForm";
 import { BorrowForm } from "./BorrowForm";
 import { WithdrawForm } from "./WithdrawForm";
 import { TransferForm } from "./TransferForm";
+import { LiquidateForm } from "./LiquidateForm";
 
 export function PolicyConsole() {
   const { address } = useAccount();
@@ -39,6 +40,7 @@ export function PolicyConsole() {
         <div className="decision-panel border border-terminal-border bg-terminal-bg p-5" aria-live="polite"><div className="mb-7 flex items-center justify-between"><span className="eyebrow">Policy decision · Withdraw</span><span className="font-mono text-[10px] text-terminal-muted">withdraw()</span></div><WithdrawForm positionRawBalance={position?.rawBalance} symbol={symbol} lifecycle={lifecycle} /></div>
         <div className="decision-panel border border-terminal-border bg-terminal-bg p-5" aria-live="polite"><div className="mb-7 flex items-center justify-between"><span className="eyebrow">Policy decision · Transfer</span><span className="font-mono text-[10px] text-terminal-muted">transfer()</span></div><TransferForm positionRawBalance={position?.rawBalance} symbol={symbol} lifecycle={lifecycle} /></div>
       </div>
+      <div className="decision-panel border border-terminal-border bg-terminal-bg p-5" aria-live="polite"><div className="mb-7 flex items-center justify-between"><span className="eyebrow">Policy decision · Liquidate</span><span className="font-mono text-[10px] text-terminal-muted">liquidate()</span></div><LiquidateForm /></div>
     </div>
     <div className="mt-7 border-t border-terminal-border pt-5">
       <div className="flex items-center justify-between">

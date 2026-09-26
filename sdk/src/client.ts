@@ -15,6 +15,7 @@ import {
   LedgerLineRegistryAbi,
   LedgerLineVaultAdapterAbi,
   LedgerLineTransferAdapterAbi,
+  LedgerLineLiquidationAdapterAbi,
 } from "./abi";
 import { ROBINHOOD_TESTNET_ADDRESSES, type LedgerLineAddresses } from "./addresses";
 import { robinhoodChainTestnet } from "./chain";
@@ -32,8 +33,8 @@ export type LedgerLineClientConfig = {
   /// Required for write methods (deposit/borrow/withdraw/
   /// approveCollateral). Read methods work without it.
   walletClient?: WalletClient;
-  /// Override any of the four contract addresses. Defaults to the real
-  /// V2 testnet deployment (see ./addresses.ts).
+  /// Override any of the six contract addresses. Defaults to the real
+  /// V4 testnet deployment (see ./addresses.ts).
   addresses?: Partial<LedgerLineAddresses>;
   /// Default assetId used when a method's `assetId` argument is
   /// omitted. Defaults to 1n, matching this deployment's single
@@ -49,7 +50,7 @@ export type WriteOptions = {
 
 /// LedgerLineClient -- a thin, typed wrapper over CortexRails Protocol's
 /// real deployed LedgerLine contracts (Registry, Policy, LendingAdapter,
-/// VaultAdapter, TransferAdapter), built on viem.
+/// VaultAdapter, TransferAdapter, LiquidationAdapter), built on viem.
 ///
 /// AMOUNT CONVENTION (read this before calling any write method):
 /// every `amount` parameter on this client -- deposit, borrow,
@@ -287,6 +288,79 @@ export class LedgerLineClient {
       abi: LedgerLineTransferAdapterAbi,
       functionName: "transfer",
       args: [to, amount],
+      account,
+      chain: this.chain,
+    });
+  }
+
+  // -----------------------------------------------------------------
+  // Reads -- debt / liquidation eligibility
+  // -----------------------------------------------------------------
+
+  /// Reads a user's current outstanding debt (18-decimal internal
+  /// unit, see class doc) directly from LendingAdapter.debt(). This is
+  /// the same figure LiquidationAdapter supplies to Policy.canExecute
+  /// as the LIQUIDATE `amount` -- use it to pre-check eligibility via
+  /// `checkLiquidatable` before submitting a real liquidate() call.
+  async getDebt(user: Address): Promise<bigint> {
+    const result = await this.publicClient.readContract({
+      address: this.addresses.lendingAdapter,
+      abi: LedgerLineLendingAdapterAbi,
+      functionName: "debt",
+      args: [user],
+    });
+    return result as bigint;
+  }
+
+  /// Convenience wrapper matching exactly what LiquidationAdapter does
+  /// onchain before calling liquidate(): reads `user`'s live debt, then
+  /// asks Policy.canExecute(assetId, positionId, Action.LIQUIDATE,
+  /// debt). ALLOW means a real liquidate() call against
+  /// LiquidationAdapter is expected to succeed (modulo a race with
+  /// another liquidator or a price update in between) -- BLOCK means
+  /// the position is currently healthy (or debt is zero), per whatever
+  /// `reason` is returned.
+  async checkLiquidatable(user: Address, assetId: bigint = this.assetId): Promise<PolicyResponse & { debt: bigint }> {
+    const debt = await this.getDebt(user);
+    const positionId = LedgerLineClient.positionIdFromAddress(user);
+    const response = await this.canExecute(positionId, Action.LIQUIDATE, debt, assetId);
+    return { ...response, debt };
+  }
+
+  // -----------------------------------------------------------------
+  // Writes -- LiquidationAdapter (liquidate)
+  // -----------------------------------------------------------------
+
+  /// Liquidates `borrower`'s position: LiquidationAdapter derives
+  /// their real, live debt from LendingAdapter itself (never trust a
+  /// caller-supplied debt figure for the eligibility check -- this SDK
+  /// does not pass one), asks Policy.canExecute() with
+  /// Action.LIQUIDATE, and -- only on ALLOW -- calls
+  /// LendingAdapter.liquidate() to pull `repayAmount` (18-decimal, see
+  /// class doc) from the caller and pay them `seizeAmount` of the
+  /// borrower's collateral in return. Reverts with PolicyBlocked if
+  /// the position is not currently eligible. Permissionless: any
+  /// account can call this for any borrower. The caller is responsible
+  /// for choosing a `seizeAmount` that is a fair exchange for
+  /// `repayAmount` (using live price data) and must have already
+  /// approved LendingAdapter to pull at least `repayAmount` of the
+  /// borrow token (USDG) -- see `approveCollateral` for the analogous
+  /// pattern on the collateral side. Returns a tx hash -- not
+  /// confirmation; see waitForReceipt.
+  async liquidate(
+    borrower: Address,
+    repayAmount: bigint,
+    seizeAmount: bigint,
+    options?: WriteOptions
+  ): Promise<Hash> {
+    const walletClient = this.requireWalletClient();
+    const account = this.resolveAccount(walletClient, options);
+
+    return walletClient.writeContract({
+      address: this.addresses.liquidationAdapter,
+      abi: LedgerLineLiquidationAdapterAbi,
+      functionName: "liquidate",
+      args: [borrower, repayAmount, seizeAmount],
       account,
       chain: this.chain,
     });
