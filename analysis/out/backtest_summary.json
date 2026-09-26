@@ -1,0 +1,13 @@
+{
+  "total_entry_days_simulated": 3652,
+  "entry_days_with_full_lookahead": 3420,
+  "min_lookahead_trading_days_required": 500,
+  "pct_that_became_liquidatable": 70.0,
+  "pct_that_never_became_liquidatable": 30.0,
+  "median_trading_days_to_liquidation": 72,
+  "fastest_trading_days_to_liquidation": 1,
+  "p10_trading_days_to_liquidation": 17,
+  "liquidation_trigger_ratio": 0.8,
+  "collateral_factor_bps": 7000,
+  "risk_adjustment_bps": 8000
+}

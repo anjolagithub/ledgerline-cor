@@ -391,3 +391,7 @@ or trademarked product name.
   on Robinhood Chain testnet, with block numbers and deploy txs.
 - [`docs/DEMO.md`](docs/DEMO.md): a walkthrough of the core flows with
   real transaction hashes.
+- [`docs/ANALYSIS.md`](docs/ANALYSIS.md): a reproducible historical
+  backtest of the live risk formulas against 14+ years of real TSLA
+  price data -- what would have happened to a full-capacity borrower,
+  quantified, not asserted.
