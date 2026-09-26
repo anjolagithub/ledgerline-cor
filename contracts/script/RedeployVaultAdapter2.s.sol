@@ -19,10 +19,10 @@ contract RedeployVaultAdapter2 is Script {
     uint256 constant ASSET_ID = 1;
     address constant REGISTRY = 0x88508A6d9266fbc928cC11DEE92f4EB1801B907c;
 
-    // Fill in with confirmed outputs from RedeployPolicy2.s.sol and
-    // RedeployLendingAdapter2.s.sol before broadcasting.
-    address constant NEW_POLICY = address(0); // <-- SET ME
-    address constant NEW_LENDING_ADAPTER = address(0); // <-- SET ME
+    // Deployed 2026-09-26: Policy tx 0x4cda5c91d6dec4cd870076efe9f358e745f63d942634e6ed798f053f05d8476c,
+    // LendingAdapter tx 0xf154260adadba91e04cf5e39669ca89039c00d30fe1af8700c5d16947fa393e0.
+    address constant NEW_POLICY = 0xD6ECf112af596E82DEb2EEb9e989eE6B093D5460;
+    address constant NEW_LENDING_ADAPTER = 0x020Bdf07C8970877677Ef064670a4d3BbDBcCa43;
 
     function run() external {
         require(NEW_POLICY != address(0), "Set NEW_POLICY first");
