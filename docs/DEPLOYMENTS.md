@@ -1,14 +1,63 @@
 # Deployments
 
-Source of truth: `contracts/broadcast/RedeployPolicy2.s.sol` /
-`RedeployLendingAdapter2.s.sol` / `RedeployVaultAdapter2.s.sol` /
-`RedeployTransferAdapter2.s.sol` (`.../46630/run-latest.json` in each),
-plus the `cast send` wiring transactions below. **Current (V3)** stack
-deployed **2026-09-26** on **Robinhood Chain Testnet, chain ID 46630** --
-see `docs/REDEPLOY_LIQUIDATE.md` for why and the full sequence.
-V2 addresses are kept further down for history.
+Source of truth: `contracts/broadcast/RedeployLendingAdapter3.s.sol` /
+`RedeployVaultAdapter3.s.sol` / `RedeployTransferAdapter3.s.sol` /
+`DeployLiquidationAdapter.s.sol` (`.../46630/run-latest.json` in each),
+plus the `cast send` wiring transactions below. **Current (V4)** stack
+deployed **2026-09-26** on **Robinhood Chain Testnet, chain ID 46630**.
+V3 and V2 addresses are kept further down for history.
 
-## V3: LIQUIDATE + repay() on current source (2026-09-26)
+## V4: real LIQUIDATE consumer (2026-09-26)
+
+Redeployed to add `LedgerLineLendingAdapter.liquidate()` -- a new
+function letting an authorized releaser reduce a THIRD PARTY's debt
+and seize their collateral in one call, gated by
+`isAuthorizedReleaser` (same trust pattern as `releaseCollateral`/
+`transferPosition`). This closed a real gap: `repay()` is strictly
+`debt[msg.sender]`-only and could never do this, so LIQUIDATE's
+`canExecute()` decision path (live since V3) had no consumer that
+could actually act on it.
+
+`Registry` and `Policy` are UNCHANGED from V3
+(`0xD6ECf112af596E82DEb2EEb9e989eE6B093D5460`) -- Policy has no
+dependency on LendingAdapter's address. Only LendingAdapter cascades
+(VaultAdapter/TransferAdapter both take `lendingAdapterAddress` as an
+immutable constructor arg), plus the brand-new LiquidationAdapter.
+
+| Contract | Address | Deploy tx |
+|---|---|---|
+| `LedgerLinePolicy` (unchanged from V3) | `0xD6ECf112af596E82DEb2EEb9e989eE6B093D5460` | see V3 below |
+| `LedgerLineLendingAdapter` | `0x5e559ADeb6B69E7c6f26c0aE51071a162Aa6560d` | `0x2fe55236e21a1620ccf55957034290290ad4d1365f9704895a6909a6edbdf986` |
+| `LedgerLineVaultAdapter` | `0x4E94e5AdB0b03Be4E9d7336Da7f847E4E4BA9C43` | `0x6527fdbfb67f7e619c4c0e73ef9aff4a1ccce0b19c20532ba163ece0d1dcf55d` |
+| `LedgerLineTransferAdapter` | `0x32D47195108fE08aA518D9779689F83E2154D4f1` | `0xd2af04b31bdf603cf91e31df6cf020adfbd61e8734e5951fd5aa1a7e9cf43f94` |
+| `LedgerLineLiquidationAdapter` (new consumer) | `0xB24Af6a1bAfAB462DAa4776C0bc884Ce70B3a97d` | `0xfa01bb84737aaa69dad3c446ad77eded6f663ca6b41f7af7186a3e9eecc4bce0` |
+
+Wiring, run and verified in order (owner `0x00dC0f3ff1F2bca6b3d007684cC25a766c9815f4`):
+
+| Step | Tx | Result |
+|---|---|---|
+| `Registry.setPositionWriter(new LendingAdapter)` | `0xad32db1b3d00a634552c5235c42949bfb46a7d7007cadfc3a9a636df829b8f62` | `positionWriter()` confirmed == new LendingAdapter |
+| `LendingAdapter.setAuthorizedReleaser(new VaultAdapter, true)` | `0xf61c099127803bca61ef397a2b7dd8bd0adbfde5a6dc10d4d6e4352f773405e4` | `isAuthorizedReleaser` confirmed `true` |
+| `LendingAdapter.setAuthorizedReleaser(new TransferAdapter, true)` | `0x6c0a9ba64a10b9b3036d7b748010e9c270540eef0a5c18fdb2a7e665ee3db0ef` | `isAuthorizedReleaser` confirmed `true` |
+| `LendingAdapter.setAuthorizedReleaser(new LiquidationAdapter, true)` | `0xcd4b670a491cb4131fefb96c03fa4ff023bb88e87bd990796ad7104bb7e734f6` | `isAuthorizedReleaser` confirmed `true` |
+
+Funded with 12 USDG (tx `0xb3090ac82e84ae8fccfeb4b407f6edd23c77da0fb69ae6cffb84eb40139b56c7`) -- the full remaining testnet USDG balance at the time, enough for a real borrow/repay/liquidate demo cycle, not a large liquidity pool.
+
+**Known real cost:** same as every LendingAdapter redeploy so far --
+the new instance's `debt` mapping starts at zero for every position.
+Any debt against the V3 LendingAdapter
+(`0x020Bdf07C8970877677Ef064670a4d3BbDBcCa43`, below) is only
+repayable through that old contract -- it does not carry over.
+
+**No longer a gap:** LIQUIDATE now has a real, permissionless
+consumer end to end -- `LedgerLineLiquidationAdapter.liquidate()`
+derives a borrower's live debt from LendingAdapter, calls
+`Policy.canExecute(..., Action.LIQUIDATE, debt)`, and on `ALLOW` calls
+`LendingAdapter.liquidate()` to actually move tokens. Surfaced in the
+frontend's Policy Console (`components/LiquidateForm.tsx`) and the
+SDK (`LedgerLineClient.checkLiquidatable()` / `.liquidate()`).
+
+## V3: LIQUIDATE + repay() on current source (2026-09-26, superseded above by V4's LendingAdapter/VaultAdapter/TransferAdapter)
 
 Redeployed because the live V2 Policy/LendingAdapter predated the
 current source's LIQUIDATE decision path and `repay()`. `Registry` is
@@ -35,10 +84,12 @@ zero for every position. Any debt against the V2 LendingAdapter
 (`0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97`, below) is only repayable
 through that old contract -- it does not carry over.
 
-**Known real gap:** LIQUIDATE's `canExecute()` path is now callable and
-correct (verified: `RiskEngine.isLiquidatable(100, 7000, 71)` returns
-`true`), but there is still no LiquidationAdapter consumer contract or
-frontend flow -- it is not actionable from the app yet.
+**Known real gap (closed by V4 above):** at this point, LIQUIDATE's
+`canExecute()` path was callable and correct (verified:
+`RiskEngine.isLiquidatable(100, 7000, 71)` returns `true`), but there
+was still no LiquidationAdapter consumer contract or frontend flow --
+not actionable from the app yet. V4 added
+`LedgerLineLiquidationAdapter` and the frontend flow that consumes it.
 
 Fund the new LendingAdapter with testnet USDG before testing
 `borrow()`/`repay()` against it (Paxos faucet, see `docs/INTEGRATIONS.md`).
@@ -138,8 +189,8 @@ decision path — see `docs/INTEGRATIONS.md`.
   value, not a live oracle read; see `docs/INTEGRATIONS.md`.
 - `collateralFactorBps = 7000` (70%)
 - `riskAdjustmentBps = 8000` (80%)
-- `Registry.positionWriter` = `LedgerLineLendingAdapter`
-- `LedgerLineLendingAdapter.isAuthorizedReleaser[VaultAdapter] = true` (now the debt-safe `0xfF7E…5A6b`; see above)
+- `Registry.positionWriter` = `LedgerLineLendingAdapter` (now the V4 instance, `0x5e55…560d`; see V4 above)
+- `LedgerLineLendingAdapter.isAuthorizedReleaser` = `true` for the V4 VaultAdapter, TransferAdapter, AND LiquidationAdapter (see V4 above)
 
 ## Stylus engines (PositionEngine / RiskEngine)
 

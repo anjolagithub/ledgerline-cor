@@ -1,5 +1,11 @@
 # Redeploying for LIQUIDATE + repay() support
 
+**Status:** the sequence below (V3, 2026-09-26) is historical --
+already run, confirmed, and superseded by the V4 redeploy documented
+at the bottom of this file, which added a real LIQUIDATE consumer.
+Kept here for the record of why the LIQUIDATE decision path needed a
+RiskEngine redeploy in the first place.
+
 **Why:** `contracts/src/LedgerLinePolicy.sol` and
 `LedgerLineLendingAdapter.sol` already fully implement the LIQUIDATE
 decision path and `repay()` in the current source, but the *live*
@@ -20,12 +26,12 @@ the current live instance (`0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97`)
 stays real and stays repayable only through that old contract. If there's
 open debt you care about, settle it there first or accept the split.
 
-**Known real gap even after this redeploy:** LIQUIDATE has no consumer
-contract and no frontend UI. Deploying it makes the decision path callable
-and testable (e.g. via `cast call` against `Policy.canExecute`), but it
-will not be visible or demoable in the product until a
-LiquidationAdapter-style consumer and a UI flow exist. That's a separate,
-unstarted piece of work — decide separately whether to build it.
+**Known real gap even after this redeploy (closed by V4, see bottom of
+this file):** at this point, LIQUIDATE had no consumer contract and no
+frontend UI. Deploying it made the decision path callable and testable
+(e.g. via `cast call` against `Policy.canExecute`), but it was not
+visible or demoable in the product until `LedgerLineLiquidationAdapter`
+and a UI flow existed.
 
 ## Sequence
 
@@ -123,3 +129,50 @@ Once the new stack is confirmed working, revoke the old LendingAdapter's
 releaser authorizations for the old VaultAdapter/TransferAdapter, and
 optionally leave a note in `docs/DEPLOYMENTS.md` marking them abandoned —
 mirroring exactly how the VaultAdapter debt-safety fix was closed out.
+
+---
+
+## V4: adding a real LIQUIDATE consumer (2026-09-26, run after the above)
+
+**Why:** the V3 sequence above made LIQUIDATE's `canExecute()` decision
+correct and callable, but nothing could act on an `ALLOW` -- `repay()`
+is strictly `debt[msg.sender]`-only, so there was no way for a third
+party (a liquidator) to reduce someone else's debt and take their
+collateral. This added `LedgerLineLendingAdapter.liquidate(address
+borrower, uint256 repayAmount, uint256 seizeAmount, address
+liquidator)`, gated by `isAuthorizedReleaser` (same trust pattern as
+`releaseCollateral`/`transferPosition`), plus the new
+`LedgerLineLiquidationAdapter.sol` consumer that calls it.
+
+**Cascade:** `Policy` did NOT need to be redeployed again -- it has no
+dependency on LendingAdapter's address. Only LendingAdapter (to carry
+the new function) cascades to VaultAdapter/TransferAdapter (both take
+`lendingAdapterAddress` as an immutable constructor arg), plus the
+brand-new LiquidationAdapter.
+
+Sequence actually run (same discipline as V3 -- deploy-only scripts,
+`cast send`/`cast call` verified one at a time, run from `contracts/`):
+
+```
+forge script script/RedeployLendingAdapter3.s.sol --rpc-url $RPC_URL --account <keystore> --broadcast
+# -> new LendingAdapter. Edit RedeployVaultAdapter3.s.sol,
+#    RedeployTransferAdapter3.s.sol, and DeployLiquidationAdapter.s.sol's
+#    NEW_LENDING_ADAPTER to this address, then:
+
+forge script script/RedeployVaultAdapter3.s.sol --rpc-url $RPC_URL --account <keystore> --broadcast
+forge script script/RedeployTransferAdapter3.s.sol --rpc-url $RPC_URL --account <keystore> --broadcast
+forge script script/DeployLiquidationAdapter.s.sol --rpc-url $RPC_URL --account <keystore> --broadcast
+
+cast send $REGISTRY "setPositionWriter(address)" $NEW_LENDING_ADAPTER --account <keystore> --rpc-url $RPC_URL
+cast send $NEW_LENDING_ADAPTER "setAuthorizedReleaser(address,bool)" $NEW_VAULT_ADAPTER true --account <keystore> --rpc-url $RPC_URL
+cast send $NEW_LENDING_ADAPTER "setAuthorizedReleaser(address,bool)" $NEW_TRANSFER_ADAPTER true --account <keystore> --rpc-url $RPC_URL
+cast send $NEW_LENDING_ADAPTER "setAuthorizedReleaser(address,bool)" $NEW_LIQUIDATION_ADAPTER true --account <keystore> --rpc-url $RPC_URL
+# each cast send confirmed with the matching cast call before the next
+
+cast send $USDG "transfer(address,uint256)" $NEW_LENDING_ADAPTER <amount> --account <keystore> --rpc-url $RPC_URL
+```
+
+Real addresses and tx hashes: see `docs/DEPLOYMENTS.md`'s "V4: real
+LIQUIDATE consumer" section. Frontend/SDK wiring: `sdk/src/addresses.ts`,
+`components/LiquidateForm.tsx`, and the Vercel `NEXT_PUBLIC_*_ADDRESS`
+env vars were all updated to match, same as every prior redeploy.
