@@ -41,9 +41,9 @@ contract RedeployLendingAdapter2 is Script {
     address constant TSLA = 0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E;
     address constant USDG = 0x7E955252E15c84f5768B83c41a71F9eba181802F;
 
-    // Fill in with the address RedeployPolicy2.s.sol logged and you
-    // confirmed via `cast code` before running this script.
-    address constant NEW_POLICY = address(0); // <-- SET ME before broadcasting
+    // Deployed 2026-09-26, tx 0x4cda5c91d6dec4cd870076efe9f358e745f63d942634e6ed798f053f05d8476c,
+    // riskEngine() confirmed == 0x10246f909139Aa83f7C223012bDd656472b3C2bc.
+    address constant NEW_POLICY = 0xD6ECf112af596E82DEb2EEb9e989eE6B093D5460;
 
     function run() external {
         require(NEW_POLICY != address(0), "Set NEW_POLICY to RedeployPolicy2's confirmed output first");
