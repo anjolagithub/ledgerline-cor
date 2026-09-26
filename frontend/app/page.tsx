@@ -91,17 +91,17 @@ const inputs = [
   { name: "POSITION", text: "Raw collateral balance per (assetId, positionId)." },
   { name: "RISK", text: "Collateral factor and risk adjustment, each bounded to ≤ 100%." },
   { name: "LIFECYCLE", text: "ACTIVE · RESTRICTED · CORPORATE_ACTION · SUSPENDED · MATURING · REDEEMABLE · REDEEMED. Any state other than ACTIVE blocks every action with a state-specific reason." },
-  { name: "ACTION", text: "BORROW, WITHDRAW and TRANSFER have consumers. INCREASE_LEVERAGE and LIQUIDATE are reserved in the enum with no consumer yet." },
+  { name: "ACTION", text: "BORROW, WITHDRAW and TRANSFER have consumers. LIQUIDATE's canExecute() decision path is live (Policy + RiskEngine.isLiquidatable()) but has no consumer contract or UI flow yet -- callable via canExecute(), not actionable from this app. INCREASE_LEVERAGE remains reserved in the enum only." },
 ];
 
 const deployed = [
   { name: "LedgerLineRegistry", role: "State store", address: "0x88508A6d9266fbc928cC11DEE92f4EB1801B907c" },
-  { name: "LedgerLinePolicy", role: "canExecute()", address: "0x22fA5c1C36Cc1F7557B932dE7aCDa354ee4F6F52" },
+  { name: "LedgerLinePolicy", role: "canExecute()", address: "0xD6ECf112af596E82DEb2EEb9e989eE6B093D5460" },
   { name: "PositionEngine", role: "Stylus (Rust/WASM)", address: "0xde8365dAF3CFdF952E2F946F19a4DcAcd57eFf0F" },
-  { name: "RiskEngine", role: "Stylus (Rust/WASM)", address: "0xf661dA9D3f214A181014Bc7ba8590B90F9314eC4" },
-  { name: "LedgerLineLendingAdapter", role: "BORROW consumer", address: "0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97" },
-  { name: "LedgerLineVaultAdapter", role: "WITHDRAW consumer", address: "0xfF7EC5218730AdbCAa14cdf205cc57F97D335A6b" },
-  { name: "LedgerLineTransferAdapter", role: "TRANSFER consumer", address: "0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943" },
+  { name: "RiskEngine", role: "Stylus (Rust/WASM) · isLiquidatable()", address: "0x10246f909139Aa83f7C223012bDd656472b3C2bc" },
+  { name: "LedgerLineLendingAdapter", role: "BORROW/repay() consumer", address: "0x020Bdf07C8970877677Ef064670a4d3BbDBcCa43" },
+  { name: "LedgerLineVaultAdapter", role: "WITHDRAW consumer", address: "0x919e140aa7277B64ecB124Eb79273E6fEd7682c7" },
+  { name: "LedgerLineTransferAdapter", role: "TRANSFER consumer", address: "0x8cAA372169A22a1963F686Bf0fD78D84057641B9" },
   { name: "RobinhoodStockTokenAdapter", role: "Asset adapter · not wired into Registry", address: "0x3A1B5a91DBb68C39647B5a7Fe0aDD1a59Ec3dfb9" },
   { name: "TSLA Stock Token", role: "Collateral · 18 decimals", address: "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E" },
   { name: "USDG", role: "Borrow asset · 6 decimals", address: "0x7E955252E15c84f5768B83c41a71F9eba181802F" },

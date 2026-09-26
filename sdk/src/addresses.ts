@@ -8,25 +8,36 @@ export type LedgerLineAddresses = {
   transferAdapter: Address;
 };
 
-/// Real contract addresses from the V2 deployment on Robinhood Chain
-/// testnet (chain id 46630). Registry/Policy/LendingAdapter verified
-/// directly against
-/// contracts/broadcast/DeployTestnetRealV2.s.sol/46630/run-latest.json
-/// in the ledgerline-core repo -- not assumed. `vaultAdapter` is the
-/// debt-safe redeploy (commit 9fa2c38's withdraw() debt check), deployed
-/// by contracts/script/RedeployVaultAdapter.s.sol in tx 0xe19a7c0b...
-/// (block 123626254) and authorized as a releaser on LendingAdapter; the
-/// pre-fix instance (0x5d27a9aC4bC4b63BE9939bD386c4f198B7308D67) and a
-/// codeless earlier address (0x0F705a7473461C1eF4148bC3D813E1ab15EC93ac)
-/// were both de-authorized -- see docs/DEPLOYMENTS.md. `transferAdapter` is CortexRails' third
-/// reference consumer (Action.TRANSFER, commit 0dddd0d) and is also
-/// authorized as a releaser on LendingAdapter for its no-custody
-/// transferPosition() call. Re-derive these from a fresh broadcast
-/// file if the contracts are ever redeployed again.
+/// Real contract addresses on Robinhood Chain testnet (chain id 46630).
+/// V3 stack, deployed 2026-09-26 to bring Policy/LendingAdapter onto the
+/// source that fully implements the LIQUIDATE decision path and
+/// repay() -- see docs/REDEPLOY_LIQUIDATE.md for the full sequence and
+/// docs/DEPLOYMENTS.md for the addresses this superseded.
+///
+/// `registry` is unchanged from V2 -- only Policy/LendingAdapter/
+/// VaultAdapter/TransferAdapter were redeployed, cascading because
+/// LendingAdapter.policy is immutable (no setter) and VaultAdapter/
+/// TransferAdapter both take lendingAdapterAddress in their
+/// constructors. `policy` now points at a freshly-deployed Stylus
+/// RiskEngine (0x10246f909139Aa83f7C223012bDd656472b3C2bc) with
+/// isLiquidatable() -- the previously-live RiskEngine predated that
+/// function and would have reverted every LIQUIDATE check.
+///
+/// KNOWN REAL COST: `lendingAdapter`'s debt mapping starts at zero for
+/// every position. Any debt against the prior LendingAdapter
+/// (0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97) is only repayable
+/// through that old contract -- it does not carry over.
+///
+/// Verified on-chain, not assumed: `cast code` on all five new
+/// addresses returns real bytecode; `policy.riskEngine()` ==
+/// the new RiskEngine; `lendingAdapter.policy()` == the new Policy;
+/// `registry.positionWriter()` == the new LendingAdapter;
+/// `lendingAdapter.isAuthorizedReleaser()` == true for both the new
+/// VaultAdapter and TransferAdapter.
 export const ROBINHOOD_TESTNET_ADDRESSES: LedgerLineAddresses = {
   registry: "0x88508A6d9266fbc928cC11DEE92f4EB1801B907c",
-  policy: "0x22fA5c1C36Cc1F7557B932dE7aCDa354ee4F6F52",
-  lendingAdapter: "0x39E0d1F2877c69F1a617a86d4Bd4F8B3f2493C97",
-  vaultAdapter: "0xfF7EC5218730AdbCAa14cdf205cc57F97D335A6b",
-  transferAdapter: "0xc5Af6A4a36b6e1b2B22D03b18bBA9FEA6D456943",
+  policy: "0xD6ECf112af596E82DEb2EEb9e989eE6B093D5460",
+  lendingAdapter: "0x020Bdf07C8970877677Ef064670a4d3BbDBcCa43",
+  vaultAdapter: "0x919e140aa7277B64ecB124Eb79273E6fEd7682c7",
+  transferAdapter: "0x8cAA372169A22a1963F686Bf0fD78D84057641B9",
 };
