@@ -17,9 +17,8 @@ contract RedeployTransferAdapter3 is Script {
     address constant REGISTRY = 0x88508A6d9266fbc928cC11DEE92f4EB1801B907c;
     address constant CURRENT_POLICY = 0xD6ECf112af596E82DEb2EEb9e989eE6B093D5460;
 
-    // Set to RedeployLendingAdapter3.s.sol's confirmed output before
-    // running.
-    address constant NEW_LENDING_ADAPTER = address(0);
+    // Deployed 2026-09-26, tx 0x2fe55236e21a1620ccf55957034290290ad4d1365f9704895a6909a6edbdf986.
+    address constant NEW_LENDING_ADAPTER = 0x5e559ADeb6B69E7c6f26c0aE51071a162Aa6560d;
 
     function run() external {
         require(NEW_LENDING_ADAPTER != address(0), "Set NEW_LENDING_ADAPTER first");
