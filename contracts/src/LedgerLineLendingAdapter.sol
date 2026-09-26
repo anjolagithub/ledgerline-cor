@@ -57,6 +57,14 @@ contract LedgerLineLendingAdapter is Ownable {
     event PositionTransferred(
         address indexed from, address indexed to, uint256 amount, uint256 newFromRawBalance, uint256 newToRawBalance
     );
+    event Liquidated(
+        address indexed borrower,
+        address indexed liquidator,
+        uint256 repayAmount,
+        uint256 seizeAmount,
+        uint256 newDebt,
+        uint256 newRawBalance
+    );
 
     error AssetNotInitialized();
     error NoPosition();
@@ -260,5 +268,54 @@ contract LedgerLineLendingAdapter is Ownable {
         borrowToken.safeTransferFrom(msg.sender, address(this), _toTokenAmountRoundUp(amount));
 
         emit Repaid(msg.sender, amount, newDebt);
+    }
+
+    // ---------------------------------------------------------------
+    // Liquidation (third-party debt reduction + collateral seizure)
+    // ---------------------------------------------------------------
+    /// @notice Reduces `borrower`'s debt by `repayAmount` and seizes
+    /// `seizeAmount` of their custodied collateral, paying it to
+    /// `liquidator`. Callable ONLY by an authorized releaser (e.g.
+    /// LiquidationAdapter) -- this adapter does not itself evaluate
+    /// policy or the liquidation-eligibility threshold here; the caller
+    /// is expected to have already called Policy.canExecute() with
+    /// Action.LIQUIDATE (passing the borrower's real debt as `amount`,
+    /// per Policy's documented LIQUIDATE contract) and confirmed ALLOW
+    /// before calling this. Same trust boundary as releaseCollateral/
+    /// transferPosition: a consumer that has already checked Policy and
+    /// its own extra safety rules (e.g. a minimum liquidation bonus).
+    ///
+    /// `repayAmount` and `seizeAmount` are independent -- this contract
+    /// enforces neither a fixed liquidation-bonus formula nor a
+    /// required ratio between them beyond the borrower's actual
+    /// debt/position ceilings. The caller (LiquidationAdapter) is
+    /// responsible for choosing a seizeAmount that is a fair exchange
+    /// for repayAmount using live price data; that pricing logic is
+    /// deliberately kept out of custody code, mirroring how borrow()/
+    /// repay() keep pricing out of this contract entirely.
+    function liquidate(address borrower, uint256 repayAmount, uint256 seizeAmount, address liquidator) external {
+        if (!isAuthorizedReleaser[msg.sender]) revert NotAuthorizedReleaser(msg.sender);
+
+        uint256 currentDebt = debt[borrower];
+        if (currentDebt == 0) revert NoDebt();
+        if (repayAmount > currentDebt) revert RepayExceedsDebt(repayAmount, currentDebt);
+
+        uint256 positionId = _positionId(borrower);
+        uint256 currentRawBalance = registry.getPosition(assetId, positionId).rawBalance;
+        if (seizeAmount > currentRawBalance) revert InsufficientPosition(seizeAmount, currentRawBalance);
+
+        // Effects before external calls -- atomic revert on either
+        // transfer failing undoes both the debt write and the position
+        // write, same pattern as repay()/releaseCollateral().
+        uint256 newDebt = currentDebt - repayAmount;
+        debt[borrower] = newDebt;
+
+        uint256 newRawBalance = currentRawBalance - seizeAmount;
+        registry.setPosition(assetId, positionId, newRawBalance);
+
+        borrowToken.safeTransferFrom(liquidator, address(this), _toTokenAmountRoundUp(repayAmount));
+        collateralToken.safeTransfer(liquidator, seizeAmount);
+
+        emit Liquidated(borrower, liquidator, repayAmount, seizeAmount, newDebt, newRawBalance);
     }
 }
