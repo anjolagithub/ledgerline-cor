@@ -49,9 +49,11 @@ contract RedeployPolicy2 is Script {
     address constant REGISTRY = 0x88508A6d9266fbc928cC11DEE92f4EB1801B907c;
     address constant POSITION_ENGINE = 0xde8365dAF3CFdF952E2F946F19a4DcAcd57eFf0F;
 
-    // Set to a freshly-deployed RiskEngine with isLiquidatable() (see the
-    // gotcha above) before broadcasting, if you want LIQUIDATE to work.
-    address constant RISK_ENGINE = address(0); // <-- SET ME (new RiskEngine w/ isLiquidatable)
+    // Deployed 2026-09-26, confirmed live: isLiquidatable(100, 7000, 71)
+    // returns true (cast call, https://rpc.testnet.chain.robinhood.com).
+    // Deploy tx: 0x2e3371b8e2dd00f92eb9ca06b7f46a5262ed10b8580a5fffc5887a27834c916b
+    // Activation tx: 0xfc991a4201e9ce59672dcb5f440ac8e0393299ff4c171b6b1165aba9b909e8da
+    address constant RISK_ENGINE = 0x10246f909139Aa83f7C223012bDd656472b3C2bc;
 
     function run() external {
         require(RISK_ENGINE != address(0), "Deploy the new Stylus RiskEngine first and set RISK_ENGINE");
